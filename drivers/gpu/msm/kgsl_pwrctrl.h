@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -71,7 +71,10 @@ struct kgsl_pwrctrl {
 	struct clk *imem_clk;
 	struct clk *imem_pclk;
 	unsigned int power_flags;
-	unsigned int clk_freq[KGSL_NUM_FREQ];
+	struct kgsl_pwrlevel pwrlevels[KGSL_MAX_PWRLEVELS];
+	unsigned int active_pwrlevel;
+	int requested_pwrlevel;
+	unsigned int num_pwrlevels;
 	unsigned int interval_timeout;
 	struct regulator *gpu_reg;
 	uint32_t pcl;
@@ -90,5 +93,8 @@ void kgsl_pre_hwaccess(struct kgsl_device *device);
 void kgsl_check_suspended(struct kgsl_device *device);
 int kgsl_pwrctrl_sleep(struct kgsl_device *device);
 int kgsl_pwrctrl_wake(struct kgsl_device *device);
+
+int kgsl_pwrctrl_init_sysfs(struct kgsl_device *device);
+void kgsl_pwrctrl_uninit_sysfs(struct kgsl_device *device);
 
 #endif /* _GSL_PWRCTRL_H */
