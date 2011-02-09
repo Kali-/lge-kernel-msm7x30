@@ -293,13 +293,13 @@ int kgsl_g12_setstate(struct kgsl_device *device, uint32_t flags)
 	return 0;
 }
 
-int __init
-kgsl_g12_init_pwrctrl(struct kgsl_device *device)
+static int __init
+kgsl_g12_init_pwrctrl(struct kgsl_device *device,
+		      struct platform_device *pdev)
 {
 	int result = 0;
 	const char *pclk_name;
 	struct clk *clk, *pclk;
-	struct platform_device *pdev = kgsl_driver.pdev;
 	struct kgsl_platform_data *pdata = pdev->dev.platform_data;
 	struct kgsl_g12_device *g12_device = KGSL_G12_DEVICE(device);
 	struct msm_bus_scale_pdata *bus_table = NULL;
@@ -401,7 +401,7 @@ done:
 }
 
 int __init
-kgsl_g12_init(struct kgsl_device *device)
+_kgsl_g12_init(struct kgsl_device *device, struct platform_device *pdev)
 {
 	int status = -EINVAL;
 	struct kgsl_memregion *regspace = &device->regspace;
@@ -410,6 +410,8 @@ kgsl_g12_init(struct kgsl_device *device)
 	struct kgsl_platform_data *pdata = NULL;
 
 	KGSL_DRV_VDBG("enter (device=%p)\n", device);
+
+	kgsl_g12_init_pwrctrl(device, pdev);
 
 	/* initilization of timestamp wait */
 	init_waitqueue_head(&(g12_device->wait_timestamp_wq));
@@ -495,7 +497,12 @@ kgsl_g12_init(struct kgsl_device *device)
 
 	kgsl_sharedmem_set(&device->memstore, 0, 0, device->memstore.size);
 
-	wake_lock_init(&device->idle_wakelock, WAKE_LOCK_IDLE, device->name);
+	device->pdev = pdev;
+
+	status = kgsl_register_device(device);
+	if (status)
+		goto error_close_mmu;
+
 	return 0;
 
 error_close_mmu:
@@ -517,7 +524,7 @@ error:
 	return status;
 }
 
-int kgsl_g12_close(struct kgsl_device *device)
+int _kgsl_g12_close(struct kgsl_device *device)
 {
 	struct kgsl_memregion *regspace = &device->regspace;
 
@@ -548,6 +555,28 @@ int kgsl_g12_close(struct kgsl_device *device)
 	wake_lock_destroy(&device->idle_wakelock);
 	KGSL_DRV_VDBG("return %d\n", 0);
 	return 0;
+}
+
+int kgsl_g12_close(void)
+{
+	_kgsl_g12_close(&device_2d0.dev);
+	_kgsl_g12_close(&device_2d1.dev);
+
+	return 0;
+}
+
+int kgsl_g12_init(struct platform_device *pdev)
+{
+	struct kgsl_platform_data *pdata = pdev->dev.platform_data;
+	int ret = 0;
+
+	if (pdata->grp2d0_clk_name != NULL)
+		ret = _kgsl_g12_init(&device_2d0.dev, pdev);
+
+	if (!ret && pdata->grp2d1_clk_name != NULL)
+		ret = _kgsl_g12_init(&device_2d1.dev, pdev);
+
+	return ret;
 }
 
 static int kgsl_g12_start(struct kgsl_device *device, unsigned int init_ram)
@@ -612,19 +641,6 @@ static int kgsl_g12_stop(struct kgsl_device *device)
 	if (device->pwrctrl.pwrrail_first)
 		kgsl_pwrctrl_pwrrail(device, KGSL_PWRFLAGS_POWER_OFF);
 	return 0;
-}
-
-struct kgsl_device *kgsl_get_2d_device(enum kgsl_deviceid dev_id)
-{
-	switch (dev_id) {
-	case KGSL_DEVICE_2D0:
-		return &device_2d0.dev;
-	case KGSL_DEVICE_2D1:
-		return &device_2d1.dev;
-	default:
-		KGSL_DRV_WARN("no valid device specified!");
-		return NULL;
-	}
 }
 
 static int kgsl_g12_getproperty(struct kgsl_device *device,

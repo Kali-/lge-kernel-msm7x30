@@ -487,12 +487,12 @@ kgsl_yamato_getchipid(struct kgsl_device *device)
 	return chipid;
 }
 
-int __init
-kgsl_yamato_init_pwrctrl(struct kgsl_device *device)
+static int __init
+kgsl_yamato_init_pwrctrl(struct kgsl_device *device,
+			 struct platform_device *pdev)
 {
 	int result = 0;
 	struct clk *clk, *grp_clk;
-	struct platform_device *pdev = kgsl_driver.pdev;
 	struct kgsl_platform_data *pdata = pdev->dev.platform_data;
 
 	/*acquire clocks */
@@ -609,9 +609,9 @@ done:
 }
 
 int __init
-kgsl_yamato_init(struct kgsl_device *device)
+kgsl_yamato_init(struct platform_device *pdev)
 {
-	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
+	struct kgsl_device *device = &yamato_device.dev;
 	int status = -EINVAL;
 	struct kgsl_memregion *regspace = &device->regspace;
 	struct resource *res = NULL;
@@ -619,7 +619,12 @@ kgsl_yamato_init(struct kgsl_device *device)
 
 	KGSL_DRV_VDBG("enter (device=%p)\n", device);
 
-	init_waitqueue_head(&yamato_device->ib1_wq);
+	status = kgsl_yamato_init_pwrctrl(device, pdev);
+
+	if (status)
+		return status;
+
+	init_waitqueue_head(&yamato_device.ib1_wq);
 	setup_timer(&device->idle_timer, kgsl_timer, (unsigned long)device);
 	status = kgsl_create_device_workqueue(device);
 	if (status)
@@ -713,12 +718,19 @@ kgsl_yamato_init(struct kgsl_device *device)
 		goto error_close_rb;
 	}
 
+	/* Register the device with the KGSL core */
+	device->pdev = pdev;
+	status = kgsl_register_device(device);
+
+	if (status != 0)
+		goto error_close_rb;
+
 	device->flags &= ~KGSL_FLAGS_SOFT_RESET;
 	wake_lock_init(&device->idle_wakelock, WAKE_LOCK_IDLE, device->name);
 	return 0;
 
 error_close_rb:
-	kgsl_ringbuffer_close(&yamato_device->ringbuffer);
+	kgsl_ringbuffer_close(&yamato_device.ringbuffer);
 error_free_memstore:
 	kgsl_sharedmem_free(&device->memstore);
 error_close_cmdstream:
@@ -740,12 +752,14 @@ error:
 	return status;
 }
 
-int kgsl_yamato_close(struct kgsl_device *device)
+int kgsl_yamato_close(void)
 {
+	struct kgsl_device *device = &yamato_device.dev;
 	struct kgsl_memregion *regspace = &device->regspace;
-	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
 
-	kgsl_ringbuffer_close(&yamato_device->ringbuffer);
+	kgsl_unregister_device(device);
+
+	kgsl_ringbuffer_close(&yamato_device.ringbuffer);
 	if (device->memstore.hostptr)
 		kgsl_sharedmem_free(&device->memstore);
 
@@ -923,11 +937,6 @@ static int kgsl_yamato_stop(struct kgsl_device *device)
 	if (device->pwrctrl.pwrrail_first)
 		kgsl_pwrctrl_pwrrail(device, KGSL_PWRFLAGS_POWER_OFF);
 	return 0;
-}
-
-struct kgsl_device *kgsl_get_yamato_generic_device(void)
-{
-	return &yamato_device.dev;
 }
 
 static int kgsl_yamato_getproperty(struct kgsl_device *device,
