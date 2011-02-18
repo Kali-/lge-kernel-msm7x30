@@ -636,12 +636,16 @@ struct kgsl_platform_data kgsl_pdata = {
 	.pwrrail_first = true,
 #ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
 	.pt_va_size = SZ_32M,
-	/* Maximum of 32 concurrent processes */
-	.pt_max_count = 32,
 #else
+<<<<<<< HEAD
 	.pt_va_size = SZ_128M,
 	/* We only ever have one pagetable for everybody */
 	.pt_max_count = 1,
+=======
+	/* Set the GPU pagetable size to the maximum practical
+	 * limit */
+	.pt_va_size = SZ_256M - SZ_64K,
+>>>>>>> e3a0474... msm: kgsl: Move pagetable allocation to a DMA pool
 #endif
 };
 
