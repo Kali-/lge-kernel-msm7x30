@@ -28,7 +28,6 @@
 
 #include <mach/msm_bus.h>
 
-#include "kgsl_drawctxt.h"
 #include "kgsl.h"
 #include "kgsl_yamato.h"
 #include "kgsl_log.h"
@@ -36,6 +35,7 @@
 #include "kgsl_cmdstream.h"
 #include "kgsl_postmortem.h"
 #include "kgsl_cffdump.h"
+#include "kgsl_drawctxt.h"
 
 #include "yamato_reg.h"
 
@@ -939,6 +939,132 @@ static int kgsl_yamato_stop(struct kgsl_device *device)
 	return 0;
 }
 
+static int
+kgsl_yamato_recover_hang(struct kgsl_device *device)
+{
+	int ret;
+	unsigned int *rb_buffer;
+	struct kgsl_yamato_device *yamato_device =
+			(struct kgsl_yamato_device *)device;
+	struct kgsl_ringbuffer *rb = &yamato_device->ringbuffer;
+	unsigned int timestamp;
+	unsigned int num_rb_contents;
+	unsigned int bad_context;
+	unsigned int reftimestamp;
+	unsigned int enable_ts;
+	unsigned int soptimestamp;
+	unsigned int eoptimestamp;
+	struct kgsl_yamato_context *drawctxt;
+
+	KGSL_DRV_ERR("Starting recovery from 3D GPU hang....\n");
+	rb_buffer = vmalloc(rb->buffer_desc.size);
+	if (!rb_buffer) {
+		KGSL_MEM_ERR("Failed to allocate memory for recovery: %x\n",
+				rb->buffer_desc.size);
+		return -ENOMEM;
+	}
+	/* Extract valid contents from rb which can stil be executed after
+	 * hang */
+	ret = kgsl_ringbuffer_extract(rb, rb_buffer, &num_rb_contents);
+	if (ret)
+		goto done;
+	timestamp = rb->timestamp;
+	KGSL_DRV_ERR("Last issued timestamp: %x\n", timestamp);
+	kgsl_sharedmem_readl(&device->memstore, &bad_context,
+				KGSL_DEVICE_MEMSTORE_OFFSET(current_context));
+	kgsl_sharedmem_readl(&device->memstore, &reftimestamp,
+				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts));
+	kgsl_sharedmem_readl(&device->memstore, &enable_ts,
+				KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable));
+	kgsl_sharedmem_readl(&device->memstore, &soptimestamp,
+				KGSL_DEVICE_MEMSTORE_OFFSET(soptimestamp));
+	kgsl_sharedmem_readl(&device->memstore, &eoptimestamp,
+				KGSL_DEVICE_MEMSTORE_OFFSET(eoptimestamp));
+	rmb();
+	KGSL_CTXT_ERR("Context that caused a GPU hang: %x\n", bad_context);
+	/* restart device */
+	ret = kgsl_yamato_stop(device);
+	if (ret)
+		goto done;
+	ret = kgsl_yamato_start(device, KGSL_TRUE);
+	if (ret)
+		goto done;
+	KGSL_DRV_ERR("Device has been restarted after hang\n");
+	/* Restore timestamp states */
+	kgsl_sharedmem_writel(&device->memstore,
+			KGSL_DEVICE_MEMSTORE_OFFSET(soptimestamp),
+			soptimestamp);
+	kgsl_sharedmem_writel(&device->memstore,
+			KGSL_DEVICE_MEMSTORE_OFFSET(eoptimestamp),
+			eoptimestamp);
+	kgsl_sharedmem_writel(&device->memstore,
+			KGSL_DEVICE_MEMSTORE_OFFSET(soptimestamp),
+			soptimestamp);
+	if (num_rb_contents) {
+		kgsl_sharedmem_writel(&device->memstore,
+			KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
+			reftimestamp);
+		kgsl_sharedmem_writel(&device->memstore,
+			KGSL_DEVICE_MEMSTORE_OFFSET(ts_cmp_enable),
+			enable_ts);
+	}
+	wmb();
+	/* Mark the invalid context so no more commands are accepted from
+	 * that context */
+
+	drawctxt = (struct kgsl_yamato_context *) bad_context;
+
+	KGSL_CTXT_ERR("Context that caused a GPU hang: %x\n", bad_context);
+
+	drawctxt->flags |= CTXT_FLAGS_GPU_HANG;
+
+	/* Restore valid commands in ringbuffer */
+	kgsl_ringbuffer_restore(rb, rb_buffer, num_rb_contents);
+	rb->timestamp = timestamp;
+done:
+	vfree(rb_buffer);
+	return ret;
+}
+
+static int
+kgsl_yamato_dump_and_recover(struct kgsl_device *device)
+{
+	static int recovery;
+	int result = -ETIMEDOUT;
+
+	if (device->state == KGSL_STATE_HUNG)
+		goto done;
+	if (device->state == KGSL_STATE_DUMP_AND_RECOVER && !recovery) {
+		mutex_unlock(&device->mutex);
+		wait_for_completion(&device->recovery_gate);
+		mutex_lock(&device->mutex);
+		if (!(device->state & KGSL_STATE_HUNG))
+			/* recovery success */
+			result = 0;
+	} else {
+		INIT_COMPLETION(device->recovery_gate);
+		/* Detected a hang - trigger an automatic dump */
+		kgsl_postmortem_dump(device, 0);
+		if (!recovery) {
+			recovery = 1;
+			result = kgsl_yamato_recover_hang(device);
+			if (result)
+				device->state = KGSL_STATE_HUNG;
+			recovery = 0;
+			complete_all(&device->recovery_gate);
+		} else
+			KGSL_DRV_ERR("Cannot recover from another hang while "
+					"recovering from a hang\n");
+	}
+done:
+	return result;
+}
+
+struct kgsl_device *kgsl_get_yamato_generic_device(void)
+{
+	return &yamato_device.dev;
+}
+
 static int kgsl_yamato_getproperty(struct kgsl_device *device,
 				enum kgsl_property_type type,
 				void *value,
@@ -1280,6 +1406,7 @@ static long kgsl_yamato_ioctl(struct kgsl_device_private *dev_priv,
 {
 	int result = 0;
 	struct kgsl_drawctxt_set_bin_base_offset binbase;
+	struct kgsl_context *context;
 
 	switch (cmd) {
 	case IOCTL_KGSL_DRAWCTXT_SET_BIN_BASE_OFFSET:
@@ -1289,10 +1416,11 @@ static long kgsl_yamato_ioctl(struct kgsl_device_private *dev_priv,
 			break;
 		}
 
-		if (test_bit(binbase.drawctxt_id, dev_priv->ctxt_bitmap)) {
+		context = kgsl_find_context(dev_priv, binbase.drawctxt_id);
+		if (context) {
 			result = kgsl_drawctxt_set_bin_base_offset(
 					dev_priv->device,
-					binbase.drawctxt_id,
+					context,
 					binbase.offset);
 		} else {
 			result = -EINVAL;
