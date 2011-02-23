@@ -586,6 +586,7 @@ static int kgsl_g12_start(struct kgsl_device *device, unsigned int init_ram)
 
 	device->state = KGSL_STATE_INIT;
 	device->requested_state = KGSL_STATE_NONE;
+	KGSL_PWR_INFO("state -> INIT, device %d\n", device->id);
 
 	/* Order pwrrail/clk sequence based upon platform. */
 	if (device->pwrctrl.pwrrail_first)
@@ -849,6 +850,7 @@ static int kgsl_g12_wait(struct kgsl_device *device,
 	else if (timeout == 0) {
 		status = -ETIMEDOUT;
 		device->state = KGSL_STATE_HUNG;
+		KGSL_PWR_INFO("state -> HUNG, device %d\n", device->id);
 	}
 	else
 		status = timeout;

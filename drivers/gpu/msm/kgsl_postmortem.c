@@ -671,7 +671,9 @@ int kgsl_postmortem_dump(struct kgsl_device *device)
 	if (device->id == KGSL_DEVICE_YAMATO) {
 		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_IRQ_OFF);
 		del_timer(&device->idle_timer);
-		device->state = KGSL_STATE_HUNG;
+		device->state = KGSL_STATE_DUMP_AND_RECOVER;
+		KGSL_PWR_INFO("state -> DUMP_AND_RECOVER, device %d\n",
+					 device->id);
 		KGSL_DRV_ERR("wait for work in workqueue to complete\n");
 		mutex_unlock(&device->mutex);
 		flush_workqueue(device->work_queue);
