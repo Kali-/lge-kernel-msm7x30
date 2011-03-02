@@ -1205,6 +1205,7 @@ static struct resource kgsl_resources[] = {
 		.flags = IORESOURCE_IRQ,
        },
 };
+<<<<<<< HEAD
 static struct kgsl_platform_data kgsl_pdata = {
 	.high_axi_3d = 128000, /* Max for 8K */
 	.max_grp2d_freq = 0,
@@ -1218,6 +1219,11 @@ static struct kgsl_platform_data kgsl_pdata = {
 	.grp2d0_clk_name = NULL,
 	.idle_timeout_3d = HZ/5,
 	.idle_timeout_2d = 0,
+=======
+
+static struct kgsl_core_platform_data kgsl_core_pdata = {
+	.imem_clk_name.clk = "imem_clk",
+>>>>>>> 2fddee1... msm: kgsl: platform_data restructure for 2D/3D devices
 
 	/* pt_va_base is currently shared between kgsl devices */
 	.pt_va_base = 0x66000000,
@@ -1226,6 +1232,47 @@ static struct kgsl_platform_data kgsl_pdata = {
 #else
 	.pt_va_size = SZ_128M,
 #endif
+};
+
+static struct kgsl_device_platform_data kgsl_3d0_pdata = {
+	.pwr_data = {
+		.pwrlevel = {
+			{
+				.gpu_freq = 0,
+				.bus_freq = 128000000,
+			},
+		},
+		.init_level = 0,
+		.num_levels = 1,
+		.set_grp_async = NULL,
+		.idle_timeout = HZ/5,
+	},
+	.clk = {
+		.name = {
+			.clk = "grp_clk",
+		},
+	},
+};
+
+static struct kgsl_device_platform_data kgsl_2d0_pdata = {
+	.pwr_data = {
+		.set_grp_async = NULL,
+		.idle_timeout = 0,
+	},
+	.clk = {
+		.name = {
+			.clk = NULL,
+		},
+	},
+};
+
+static struct kgsl_device_platform_data kgsl_2d1_pdata;
+
+static struct kgsl_platform_data kgsl_pdata = {
+	.core = &kgsl_core_pdata,
+	.dev_3d0 = &kgsl_3d0_pdata,
+	.dev_2d0 = &kgsl_2d0_pdata,
+	.dev_2d1 = &kgsl_2d1_pdata,
 };
 
 static struct platform_device msm_device_kgsl = {
