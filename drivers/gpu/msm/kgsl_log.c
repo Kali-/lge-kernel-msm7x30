@@ -490,23 +490,49 @@ static const struct file_operations kgsl_mh_debug_fops = {
 
 #endif /* CONFIG_DEBUG_FS */
 
-int kgsl_debug_init(void)
-{
 #ifdef CONFIG_DEBUG_FS
-	struct dentry *dent;
-	dent = debugfs_create_dir("kgsl", 0);
-	if (IS_ERR(dent))
+int kgsl_yamato_debugfs_init(struct kgsl_device *device)
+{
+	if (!device->d_debugfs || IS_ERR(device->d_debugfs))
 		return 0;
 
-	debugfs_create_file("log_level_cmd", 0644, dent, 0,
+	debugfs_create_file("ib_dump",  0600, device->d_debugfs, device,
+			    &kgsl_ib_dump_fops);
+	debugfs_create_file("istore",   0400, device->d_debugfs, device,
+			    &kgsl_istore_fops);
+	debugfs_create_file("sx_debug", 0400, device->d_debugfs, device,
+			    &kgsl_sx_debug_fops);
+	debugfs_create_file("cp_debug", 0400, device->d_debugfs, device,
+			    &kgsl_cp_debug_fops);
+	debugfs_create_file("mh_debug", 0400, device->d_debugfs, device,
+			    &kgsl_mh_debug_fops);
+	debugfs_create_file("cff_dump", 0644, device->d_debugfs, device,
+			    &kgsl_cff_dump_enable_fops);
+
+	return 0;
+}
+#else
+int kgsl_yamato_debugfs_init(struct kgsl_device *device)
+{
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_DEBUG_FS
+int kgsl_debug_init(struct dentry *dir)
+{
+	if (!dir || IS_ERR(dir))
+		return 0;
+
+	debugfs_create_file("log_level_cmd", 0644, dir, 0,
 				&kgsl_cmd_log_fops);
-	debugfs_create_file("log_level_ctxt", 0644, dent, 0,
+	debugfs_create_file("log_level_ctxt", 0644, dir, 0,
 				&kgsl_ctxt_log_fops);
-	debugfs_create_file("log_level_drv", 0644, dent, 0,
+	debugfs_create_file("log_level_drv", 0644, dir, 0,
 				&kgsl_drv_log_fops);
-	debugfs_create_file("log_level_mem", 0644, dent, 0,
+	debugfs_create_file("log_level_mem", 0644, dir, 0,
 				&kgsl_mem_log_fops);
-	debugfs_create_file("log_level_pwr", 0644, dent, 0,
+	debugfs_create_file("log_level_pwr", 0644, dir, 0,
 				&kgsl_pwr_log_fops);
 
 	debugfs_create_file("ib_dump",  0600, dent, 0, &kgsl_ib_dump_fops);
@@ -516,7 +542,7 @@ int kgsl_debug_init(void)
 	debugfs_create_file("mh_debug", 0400, dent, 0, &kgsl_mh_debug_fops);
 
 #ifdef CONFIG_MSM_KGSL_MMU
-	debugfs_create_file("cache_enable", 0644, dent, 0,
+	debugfs_create_file("cache_enable", 0644, dir, 0,
 				&kgsl_cache_enable_fops);
 #endif
 
@@ -526,3 +552,9 @@ int kgsl_debug_init(void)
 #endif /* CONFIG_DEBUG_FS */
 	return 0;
 }
+#else
+int kgsl_debug_init(struct dentry *dir)
+{
+	return 0;
+}
+#endif /* CONFIG_DEBUG_FS */
