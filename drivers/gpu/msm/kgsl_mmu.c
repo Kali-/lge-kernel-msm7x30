@@ -275,20 +275,18 @@ void kgsl_mh_intrcallback(struct kgsl_device *device)
 	unsigned int status = 0;
 	unsigned int reg;
 
-	KGSL_MEM_VDBG("enter (device=%p)\n", device);
-
-	kgsl_regread(device, mmu_reg[device->id].interrupt_status, &status);
+	kgsl_regread(device, device->mmu.reg.interrupt_status, &status);
 
 	if (status & MH_INTERRUPT_MASK__AXI_READ_ERROR) {
-		KGSL_MEM_FATAL("axi read error interrupt\n");
+		KGSL_MEM_CRIT(device, "axi read error interrupt\n");
 	} else if (status & MH_INTERRUPT_MASK__AXI_WRITE_ERROR) {
-		KGSL_MEM_FATAL("axi write error interrupt\n");
+		KGSL_MEM_CRIT(device, "axi write error interrupt\n");
 	} else if (status & MH_INTERRUPT_MASK__MMU_PAGE_FAULT) {
-		kgsl_regread(device, mmu_reg[device->id].page_fault, &reg);
-		KGSL_MEM_FATAL("mmu page fault interrupt: %08x\n", reg);
+		kgsl_regread(device, device->mmu.reg.page_fault, &reg);
+		KGSL_MEM_CRIT(device, "mmu page fault interrupt: %08x\n", reg);
 	} else {
-		KGSL_MEM_DBG("bad bits in REG_MH_INTERRUPT_STATUS %08x\n",
-			     status);
+		KGSL_MEM_WARN(device,
+			"bad bits in REG_MH_INTERRUPT_STATUS %08x\n", status);
 	}
 
 	kgsl_regwrite(device, mmu_reg[device->id].interrupt_clear, status);
@@ -297,8 +295,6 @@ void kgsl_mh_intrcallback(struct kgsl_device *device)
 	* specifically, page faults should probably nuke the client that
 	* caused them, but we don't have enough info to figure that out yet.
 	*/
-
-	KGSL_MEM_VDBG("return\n");
 }
 
 static struct kgsl_pagetable *kgsl_mmu_createpagetableobject(
@@ -307,11 +303,10 @@ static struct kgsl_pagetable *kgsl_mmu_createpagetableobject(
 	int status = 0;
 	struct kgsl_pagetable *pagetable = NULL;
 
-	KGSL_MEM_VDBG("enter (pt_name=%d)\n", name);
-
 	pagetable = kzalloc(sizeof(struct kgsl_pagetable), GFP_KERNEL);
 	if (pagetable == NULL) {
-		KGSL_MEM_ERR("Unable to allocate pagetable object.\n");
+		KGSL_CORE_ERR("kzalloc(%d) failed\n",
+			sizeof(struct kgsl_pagetable));
 		return NULL;
 	}
 
@@ -330,21 +325,22 @@ static struct kgsl_pagetable *kgsl_mmu_createpagetableobject(
 	pagetable->tlbflushfilter.base = (unsigned int *)
 			kzalloc(pagetable->tlbflushfilter.size, GFP_KERNEL);
 	if (!pagetable->tlbflushfilter.base) {
-		KGSL_MEM_ERR("Failed to create tlbflushfilter\n");
+		KGSL_CORE_ERR("kzalloc(%d) failed\n",
+			pagetable->tlbflushfilter.size);
 		goto err_alloc;
 	}
 	GSL_TLBFLUSH_FILTER_RESET();
 
 	pagetable->pool = gen_pool_create(KGSL_PAGESIZE_SHIFT, -1);
 	if (pagetable->pool == NULL) {
-		KGSL_MEM_ERR("Unable to allocate virtualaddr pool.\n");
+		KGSL_CORE_ERR("gen_pool_create(%d) failed\n",
+			KGSL_PAGESIZE_SHIFT);
 		goto err_flushfilter;
 	}
 
 	if (gen_pool_add(pagetable->pool, pagetable->va_base,
 				pagetable->va_range, -1)) {
-		KGSL_MEM_ERR("gen_pool_create failed for pagetable %p\n",
-				pagetable);
+		KGSL_CORE_ERR("gen_pool_add failed\n");
 		goto err_pool;
 	}
 
@@ -353,7 +349,7 @@ static struct kgsl_pagetable *kgsl_mmu_createpagetableobject(
 						 &pagetable->base.physaddr);
 
 	if (pagetable->base.hostptr == NULL) {
-		KGSL_MEM_ERR("Unable to allocate memory for the pagetable\n");
+		KGSL_CORE_ERR("dma_pool_alloc failed\n");
 		goto err_pool;
 	}
 
@@ -375,7 +371,6 @@ static struct kgsl_pagetable *kgsl_mmu_createpagetableobject(
 	/* Create the sysfs entries */
 	pagetable_add_sysfs_objects(pagetable);
 
-	KGSL_MEM_VDBG("return %p\n", pagetable);
 	return pagetable;
 
 err_pool:
@@ -390,8 +385,6 @@ err_alloc:
 
 static void kgsl_mmu_destroypagetable(struct kgsl_pagetable *pagetable)
 {
-	KGSL_MEM_VDBG("enter (pagetable=%p)\n", pagetable);
-
 	list_del(&pagetable->list);
 
 	pagetable_remove_sysfs_objects(pagetable);
@@ -461,13 +454,10 @@ int kgsl_mmu_setstate(struct kgsl_device *device,
 	int status = 0;
 	struct kgsl_mmu *mmu = &device->mmu;
 
-	KGSL_MEM_VDBG("enter (device=%p, pagetable=%p)\n", device, pagetable);
-
 	if (mmu->flags & KGSL_FLAGS_STARTED) {
 		/* page table not current, then setup mmu to use new
 		 *  specified page table
 		 */
-		KGSL_MEM_INFO("from %p to %p\n", mmu->hwpagetable, pagetable);
 		if (mmu->hwpagetable != pagetable) {
 			mmu->hwpagetable = pagetable;
 			spin_lock(&mmu->hwpagetable->lock);
@@ -482,8 +472,6 @@ int kgsl_mmu_setstate(struct kgsl_device *device,
 		}
 	}
 
-	KGSL_MEM_VDBG("return %d\n", status);
-
 	return status;
 }
 
@@ -494,10 +482,8 @@ int kgsl_mmu_init(struct kgsl_device *device)
 	 *
 	 * call this with the global lock held
 	 */
-	int status;
+	int status = 0;
 	struct kgsl_mmu *mmu = &device->mmu;
-
-	KGSL_MEM_VDBG("enter (device=%p)\n", device);
 
 	mmu->device = device;
 
@@ -506,10 +492,8 @@ int kgsl_mmu_init(struct kgsl_device *device)
 #endif
 
 	/* MMU not enabled */
-	if ((mmu->config & 0x1) == 0) {
-		KGSL_MEM_VDBG("return %d\n", 0);
+	if ((mmu->config & 0x1) == 0)
 		return 0;
-	}
 
 	/* make sure aligned to pagesize */
 	BUG_ON(mmu->mpu_base & (KGSL_PAGESIZE - 1));
@@ -524,22 +508,11 @@ int kgsl_mmu_init(struct kgsl_device *device)
 		 * cannot be mapped by the MMU
 		 */
 		status = kgsl_sharedmem_alloc_coherent(&mmu->dummyspace, 64);
-		if (status != 0) {
-			KGSL_MEM_ERR
-			    ("Unable to allocate dummy space memory.\n");
-			goto error;
-		}
-
-		kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
-				   mmu->dummyspace.size);
-
+		if (!status)
+			kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
+					   mmu->dummyspace.size);
 	}
 
-	KGSL_MEM_VDBG("return %d\n", 0);
-
-	return 0;
-
-error:
 	return status;
 }
 
@@ -553,18 +526,12 @@ int kgsl_mmu_start(struct kgsl_device *device)
 	int status;
 	struct kgsl_mmu *mmu = &device->mmu;
 
-	KGSL_MEM_VDBG("enter (device=%p)\n", device);
-
-	if (mmu->flags & KGSL_FLAGS_STARTED) {
-		KGSL_MEM_INFO("MMU already started.\n");
+	if (mmu->flags & KGSL_FLAGS_STARTED)
 		return 0;
-	}
 
 	/* MMU not enabled */
-	if ((mmu->config & 0x1) == 0) {
-		KGSL_MEM_VDBG("return %d\n", 0);
+	if ((mmu->config & 0x1) == 0)
 		return 0;
-	}
 
 	mmu->flags |= KGSL_FLAGS_STARTED;
 
@@ -572,9 +539,7 @@ int kgsl_mmu_start(struct kgsl_device *device)
 	kgsl_regwrite(device, mmu_reg[device->id].config, mmu->config);
 
 	/* enable axi interrupts */
-	KGSL_MEM_DBG("enabling mmu interrupts mask=0x%08lx\n",
-		     GSL_MMU_INT_MASK);
-	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask,
+	kgsl_regwrite(device, device->mmu.reg.interrupt_mask,
 				GSL_MMU_INT_MASK);
 
 	/* idle device */
@@ -586,9 +551,7 @@ int kgsl_mmu_start(struct kgsl_device *device)
 			mmu->mpu_base + mmu->mpu_range);
 
 	/* enable axi interrupts */
-	KGSL_MEM_DBG("enabling mmu interrupts mask=0x%08lx\n",
-		     GSL_MMU_INT_MASK | MH_INTERRUPT_MASK__MMU_PAGE_FAULT);
-	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask,
+	kgsl_regwrite(device, device->mmu.reg.interrupt_mask,
 			GSL_MMU_INT_MASK | MH_INTERRUPT_MASK__MMU_PAGE_FAULT);
 
 	/* sub-client MMU lookups require address translation */
@@ -615,12 +578,10 @@ int kgsl_mmu_start(struct kgsl_device *device)
 			      (mmu->hwpagetable->va_range >> 16)));
 		status = kgsl_setstate(device, KGSL_MMUFLAGS_TLBFLUSH);
 		if (status) {
-			KGSL_MEM_ERR("Failed to setstate TLBFLUSH\n");
+			KGSL_MEM_ERR(device, "Failed to setstate TLBFLUSH\n");
 			goto error;
 		}
 	}
-
-	KGSL_MEM_VDBG("return %d\n", 0);
 
 	return 0;
 error:
@@ -643,25 +604,19 @@ unsigned int kgsl_virtaddr_to_physaddr(unsigned int virtaddr)
 
 	pgd_ptr = pgd_offset(current->mm, virtaddr);
 	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
-		KGSL_MEM_ERR
-		    ("Invalid pgd entry found while trying to convert virtual "
-		     "address to physical\n");
+		KGSL_CORE_ERR("Invalid pgd entry\n");
 		return 0;
 	}
 
 	pmd_ptr = pmd_offset(pgd_ptr, virtaddr);
 	if (pmd_none(*pmd_ptr) || pmd_bad(*pmd_ptr)) {
-		KGSL_MEM_ERR
-		    ("Invalid pmd entry found while trying to convert virtual "
-		     "address to physical\n");
+		KGSL_CORE_ERR("Invalid pmd entry\n");
 		return 0;
 	}
 
 	pte_ptr = pte_offset_map(pmd_ptr, virtaddr);
 	if (!pte_ptr) {
-		KGSL_MEM_ERR
-		    ("Unable to map pte entry while trying to convert virtual "
-		     "address to physical\n");
+		KGSL_CORE_ERR("pt_offset_map failed\n");
 		return 0;
 	}
 	pte = *pte_ptr;
@@ -684,25 +639,19 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 	int flushtlb, alloc_size;
 	unsigned int align = flags & KGSL_MEMFLAGS_ALIGN_MASK;
 
-	KGSL_MEM_VDBG("enter (pt=%p, physaddr=%08x, range=%08d, gpuaddr=%p)\n",
-		      pagetable, address, range, gpuaddr);
-
 	BUG_ON(protflags & ~(GSL_PT_PAGE_RV | GSL_PT_PAGE_WV));
 	BUG_ON(protflags == 0);
 	BUG_ON(range <= 0);
 
 	/* Only support 4K and 8K alignment for now */
 	if (align != KGSL_MEMFLAGS_ALIGN8K && align != KGSL_MEMFLAGS_ALIGN4K) {
-		KGSL_MEM_ERR("Cannot map memory according to "
-			     "requested flags: %08x\n", flags);
+		KGSL_CORE_ERR("invalid flags: %x\n", flags);
 		return -EINVAL;
 	}
 
 	/* Make sure address being mapped is at 4K boundary */
 	if (!IS_ALIGNED(address, KGSL_PAGESIZE) || range & ~KGSL_PAGEMASK) {
-		KGSL_MEM_ERR("Cannot map address not aligned "
-			     "at page boundary: address: %08x, range: %08x\n",
-			     address, range);
+		KGSL_CORE_ERR("address %x not aligned\n", address);
 		return -EINVAL;
 	}
 	alloc_size = range;
@@ -711,9 +660,8 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 
 	*gpuaddr = gen_pool_alloc(pagetable->pool, alloc_size);
 	if (*gpuaddr == 0) {
-		KGSL_MEM_ERR("gen_pool_alloc failed: pt=%d size=%d\n",
-				pagetable->name, alloc_size);
-		KGSL_MEM_ERR("  pt %d allocated=%d, entries=%d\n",
+		KGSL_CORE_ERR("gen_pool_alloc(%d) failed\n", alloc_size);
+		KGSL_CORE_ERR(" [%d] allocated=%d, entries=%d\n",
 				pagetable->name, pagetable->stats.mapped,
 				pagetable->stats.entries);
 		return -ENOMEM;
@@ -767,9 +715,8 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 		if (physaddr) {
 			kgsl_pt_map_set(pagetable, pte, physaddr | protflags);
 		} else {
-			KGSL_MEM_ERR
-			("Unable to find physaddr for address: %x\n",
-			     address);
+			KGSL_CORE_ERR("Unable to find physaddr for"
+				"address: %x\n", address);
 			spin_unlock(&pagetable->lock);
 			kgsl_mmu_unmap(pagetable, *gpuaddr, range);
 			return -EFAULT;
@@ -785,10 +732,6 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 	KGSL_STATS_ADD(alloc_size, pagetable->stats.mapped,
 		       pagetable->stats.max_mapped);
 
-	KGSL_MEM_INFO("pt %p p %08x g %08x pte f %d l %d n %d f %d\n",
-		      pagetable, address, *gpuaddr, ptefirst, ptelast,
-		      numpages, flushtlb);
-
 	mb();
 	dsb();
 	outer_sync();
@@ -802,9 +745,6 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 	}
 	spin_unlock(&pagetable->lock);
 
-
-	KGSL_MEM_VDBG("return %d\n", 0);
-
 	return 0;
 }
 
@@ -815,9 +755,6 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 	unsigned int numpages;
 	unsigned int pte, ptefirst, ptelast, superpte;
 
-	KGSL_MEM_VDBG("enter (pt=%p, gpuaddr=0x%08x, range=%d)\n",
-			pagetable, gpuaddr, range);
-
 	BUG_ON(range <= 0);
 
 	numpages = (range >> KGSL_PAGESIZE_SHIFT);
@@ -826,9 +763,6 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 
 	ptefirst = kgsl_pt_entry_get(pagetable, gpuaddr);
 	ptelast = ptefirst + numpages;
-
-	KGSL_MEM_INFO("pt %p gpu %08x pte first %d last %d numpages %d\n",
-		      pagetable, gpuaddr, ptefirst, ptelast, numpages);
 
 	spin_lock(&pagetable->lock);
 	superpte = ptefirst - (ptefirst & (GSL_PT_SUPER_PTE-1));
@@ -857,8 +791,6 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 
 	gen_pool_free(pagetable->pool, gpuaddr, range);
 
-	KGSL_MEM_VDBG("return %d\n", 0);
-
 	return 0;
 }
 #endif /*CONFIG_MSM_KGSL_MMU*/
@@ -870,8 +802,10 @@ int kgsl_mmu_map_global(struct kgsl_pagetable *pagetable,
 	int result = -EINVAL;
 	unsigned int gpuaddr = 0;
 
-	if (memdesc == NULL)
+	if (memdesc == NULL) {
+		KGSL_CORE_ERR("invalid memdesc\n");
 		goto error;
+	}
 
 	result = kgsl_mmu_map(pagetable, memdesc->physaddr, memdesc->size,
 				protflags, &gpuaddr, flags);
@@ -883,9 +817,9 @@ int kgsl_mmu_map_global(struct kgsl_pagetable *pagetable,
 		memdesc->gpuaddr = gpuaddr;
 
 	else if (memdesc->gpuaddr != gpuaddr) {
-		KGSL_MEM_ERR("pt %p addr mismatch phys 0x%08x gpu 0x%0x 0x%08x",
-				pagetable, memdesc->physaddr,
-				memdesc->gpuaddr, gpuaddr);
+		KGSL_CORE_ERR("pt %p addr mismatch phys 0x%08x"
+			"gpu 0x%0x 0x%08x", pagetable, memdesc->physaddr,
+			memdesc->gpuaddr, gpuaddr);
 		goto error_unmap;
 	}
 	return result;
@@ -904,11 +838,8 @@ int kgsl_mmu_stop(struct kgsl_device *device)
 	 */
 	struct kgsl_mmu *mmu = &device->mmu;
 
-	KGSL_MEM_VDBG("enter (device=%p)\n", device);
-
 	if (mmu->flags & KGSL_FLAGS_STARTED) {
 		/* disable mh interrupts */
-		KGSL_MEM_DBG("disabling mmu interrupts\n");
 		/* disable MMU */
 		kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask, 0);
 		kgsl_regwrite(device, mmu_reg[device->id].config, 0x00000000);
@@ -916,11 +847,7 @@ int kgsl_mmu_stop(struct kgsl_device *device)
 		mmu->flags &= ~KGSL_FLAGS_STARTED;
 	}
 
-	KGSL_MEM_VDBG("return %d\n", 0);
-
 	return 0;
-
-
 }
 
 int kgsl_mmu_close(struct kgsl_device *device)
@@ -932,12 +859,8 @@ int kgsl_mmu_close(struct kgsl_device *device)
 	 */
 	struct kgsl_mmu *mmu = &device->mmu;
 
-	KGSL_MEM_VDBG("enter (device=%p)\n", device);
-
 	if (mmu->dummyspace.gpuaddr)
 		kgsl_sharedmem_free(&mmu->dummyspace);
-
-	KGSL_MEM_VDBG("return %d\n", 0);
 
 	return 0;
 }
