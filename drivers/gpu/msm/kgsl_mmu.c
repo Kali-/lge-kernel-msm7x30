@@ -692,6 +692,8 @@ static void kgsl_mmu_destroypagetable(struct kgsl_pagetable *pagetable)
 
 	kgsl_driver.stats.coherent -= KGSL_PAGETABLE_SIZE;
 
+	kgsl_driver.stats.coherent -= kgsl_driver.ptsize;
+
 	if (pagetable->pool) {
 		gen_pool_destroy(pagetable->pool);
 		pagetable->pool = NULL;
