@@ -705,17 +705,11 @@ kgsl_yamato_init(struct platform_device *pdev)
 		goto error_free_irq;
 	}
 
-	status = kgsl_cmdstream_init(device);
-	if (status != 0) {
-		status = -ENODEV;
-		goto error_close_mmu;
-	}
-
 	status = kgsl_sharedmem_alloc_coherent(&device->memstore,
 					       sizeof(device->memstore));
 	if (status != 0)  {
 		status = -ENODEV;
-		goto error_close_cmdstream;
+		goto error_close_mmu;
 	}
 	status = kgsl_ringbuffer_init(device);
 	if (status != 0)
@@ -744,8 +738,6 @@ error_close_rb:
 	kgsl_ringbuffer_close(&yamato_device.ringbuffer);
 error_free_memstore:
 	kgsl_sharedmem_free(&device->memstore);
-error_close_cmdstream:
-	kgsl_cmdstream_close(device);
 error_close_mmu:
 	kgsl_mmu_close(device);
 error_free_irq:
