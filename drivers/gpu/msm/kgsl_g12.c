@@ -114,7 +114,8 @@ static struct kgsl_g12_device device_2d0 = {
 				.invalidate = ADDR_MH_MMU_INVALIDATE,
 				.interrupt_mask = ADDR_MH_INTERRUPT_MASK,
 				.interrupt_status = ADDR_MH_INTERRUPT_STATUS,
-				.interrupt_clear = ADDR_MH_INTERRUPT_CLEAR
+				.interrupt_clear = ADDR_MH_INTERRUPT_CLEAR,
+				.axi_error = ADDR_MH_AXI_ERROR,
 			},
 		},
 		.pwrctrl = {
@@ -160,7 +161,8 @@ static struct kgsl_g12_device device_2d1 = {
 				.invalidate = ADDR_MH_MMU_INVALIDATE,
 				.interrupt_mask = ADDR_MH_INTERRUPT_MASK,
 				.interrupt_status = ADDR_MH_INTERRUPT_STATUS,
-				.interrupt_clear = ADDR_MH_INTERRUPT_CLEAR
+				.interrupt_clear = ADDR_MH_INTERRUPT_CLEAR,
+				.axi_error = ADDR_MH_AXI_ERROR,
 			},
 		},
 		.pwrctrl = {
