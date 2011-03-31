@@ -319,12 +319,12 @@ kgsl_ptpool_get(struct kgsl_memdesc *memdesc)
 	   freed.0 This saves us from having to do the memset here */
 
 	memdesc->hostptr = kgsl_driver.ptpool.hostptr +
-		(pt * kgsl_driver.ptsize);
+		(pt * KGSL_PAGETABLE_SIZE);
 
 	memdesc->physaddr = kgsl_driver.ptpool.physaddr +
-		(pt * kgsl_driver.ptsize);
+		(pt * KGSL_PAGETABLE_SIZE);
 
-	memdesc->size = kgsl_driver.ptsize;
+	memdesc->size = KGSL_PAGETABLE_SIZE;
 
 	return 0;
 }
@@ -339,7 +339,7 @@ kgsl_ptpool_put(struct kgsl_memdesc *memdesc)
 		return;
 
 	pt = (memdesc->hostptr - kgsl_driver.ptpool.hostptr)
-		/ kgsl_driver.ptsize;
+		/ KGSL_PAGETABLE_SIZE;
 
 	/* Clear the memory now to avoid having to do it next time
 	   these entries are allocated */
@@ -406,10 +406,11 @@ static struct kgsl_pagetable *kgsl_mmu_createpagetableobject(
 	/* ptpool allocations are from coherent memory, so update the
 	   device statistics acordingly */
 
-	KGSL_STATS_ADD(kgsl_driver.ptsize, kgsl_driver.stats.coherent,
+	KGSL_STATS_ADD(KGSL_PAGETABLE_SIZE, kgsl_driver.stats.coherent,
 		       kgsl_driver.stats.coherent_max);
 
 	pagetable->base.gpuaddr = pagetable->base.physaddr;
+	pagetable->base.size = KGSL_PAGETABLE_SIZE;
 
 	status = kgsl_setup_pt(pagetable);
 	if (status)
@@ -443,6 +444,8 @@ static void kgsl_mmu_destroypagetable(struct kgsl_pagetable *pagetable)
 	kgsl_cleanup_pt(pagetable);
 
 	kgsl_ptpool_put(&pagetable->base);
+
+	kgsl_driver.stats.coherent -= KGSL_PAGETABLE_SIZE;
 
 	if (pagetable->pool) {
 		gen_pool_destroy(pagetable->pool);
