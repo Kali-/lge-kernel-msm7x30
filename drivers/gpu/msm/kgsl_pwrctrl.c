@@ -255,6 +255,116 @@ void kgsl_pwrctrl_irq(struct kgsl_device *device, unsigned int pwrflag)
 	}
 }
 
+int kgsl_pwrctrl_init(struct kgsl_device *device)
+{
+	int i, result = 0;
+	struct clk *clk;
+	struct platform_device *pdev = device->pdev;
+	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
+	struct kgsl_device_platform_data *pdata_dev = pdev->dev.platform_data;
+	struct kgsl_device_pwr_data *pdata_pwr = &pdata_dev->pwr_data;
+	const char *clk_names[KGSL_MAX_CLKS] = {pwr->src_clk_name,
+						pdata_dev->clk.name.clk,
+						pdata_dev->clk.name.pclk,
+						pdata_dev->imem_clk_name.clk,
+						pdata_dev->imem_clk_name.pclk};
+
+	/*acquire clocks */
+	for (i = 1; i < KGSL_MAX_CLKS; i++) {
+		if (clk_names[i]) {
+			clk = clk_get(&pdev->dev, clk_names[i]);
+			if (IS_ERR(clk))
+				goto clk_err;
+			pwr->grp_clks[i] = clk;
+		}
+	}
+	/* Make sure we have a source clk for freq setting */
+	clk = clk_get(&pdev->dev, clk_names[0]);
+	pwr->grp_clks[0] = (IS_ERR(clk)) ? pwr->grp_clks[1] : clk;
+
+	/* put the AXI bus into asynchronous mode with the graphics cores */
+	if (pdata_pwr->set_grp_async != NULL)
+		pdata_pwr->set_grp_async();
+
+	if (pdata_pwr->num_levels > KGSL_MAX_PWRLEVELS) {
+		KGSL_PWR_ERR(device, "invalid power level count: %d\n",
+					 pdata_pwr->num_levels);
+		result = -EINVAL;
+		goto done;
+	}
+	pwr->num_pwrlevels = pdata_pwr->num_levels;
+	pwr->active_pwrlevel = pdata_pwr->init_level;
+	for (i = 0; i < pdata_pwr->num_levels; i++) {
+		pwr->pwrlevels[i].gpu_freq =
+		(pdata_pwr->pwrlevel[i].gpu_freq > 0) ?
+		clk_round_rate(pwr->grp_clks[0],
+					   pdata_pwr->pwrlevel[i].
+					   gpu_freq) : 0;
+		pwr->pwrlevels[i].bus_freq =
+			pdata_pwr->pwrlevel[i].bus_freq;
+	}
+	/* Do not set_rate for targets in sync with AXI */
+	if (pwr->pwrlevels[0].gpu_freq > 0)
+		clk_set_rate(pwr->grp_clks[0], pwr->
+				pwrlevels[pwr->num_pwrlevels - 1].gpu_freq);
+
+	pwr->gpu_reg = regulator_get(NULL, pwr->regulator_name);
+	if (IS_ERR(pwr->gpu_reg))
+		pwr->gpu_reg = NULL;
+	if (internal_pwr_rail_mode(device->pwrctrl.pwr_rail,
+						PWR_RAIL_CTL_MANUAL)) {
+		KGSL_PWR_ERR(device, "internal_pwr_rail_mode failed\n");
+		result = -EINVAL;
+		goto done;
+	}
+
+	pwr->power_flags = KGSL_PWRFLAGS_CLK_OFF |
+			KGSL_PWRFLAGS_AXI_OFF | KGSL_PWRFLAGS_POWER_OFF |
+			KGSL_PWRFLAGS_IRQ_OFF;
+	pwr->nap_allowed = pdata_pwr->nap_allowed;
+	pwr->interval_timeout = pdata_pwr->idle_timeout;
+	pwr->ebi1_clk = clk_get(NULL, "ebi1_kgsl_clk");
+	if (IS_ERR(pwr->ebi1_clk))
+		pwr->ebi1_clk = NULL;
+	else
+		clk_set_rate(pwr->ebi1_clk,
+					 pwr->pwrlevels[pwr->active_pwrlevel].
+						bus_freq);
+	if (pdata_dev->clk.bus_scale_table != NULL) {
+		pwr->pcl =
+			msm_bus_scale_register_client(pdata_dev->clk.
+							bus_scale_table);
+		if (!pwr->pcl) {
+			KGSL_PWR_ERR(device,
+					"msm_bus_scale_register_client failed: "
+					"id %d table %p", device->id,
+					pdata_dev->clk.bus_scale_table);
+			result = -EINVAL;
+			goto done;
+		}
+	}
+
+	/*acquire interrupt */
+	pwr->interrupt_num =
+		platform_get_irq_byname(pdev, pwr->irq_name);
+
+	if (pwr->interrupt_num <= 0) {
+		KGSL_PWR_ERR(device, "platform_get_irq_byname failed: %d\n",
+					 pwr->interrupt_num);
+		result = -EINVAL;
+		goto done;
+	}
+	return result;
+
+clk_err:
+	result = PTR_ERR(clk);
+	KGSL_PWR_ERR(device, "clk_get(%s) failed: %d\n",
+				 clk_names[i], result);
+
+done:
+	return result;
+}
+
 void kgsl_pwrctrl_close(struct kgsl_device *device)
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
