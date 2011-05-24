@@ -73,13 +73,20 @@ struct kgsl_pwrctrl {
 	unsigned int power_flags;
 	struct kgsl_pwrlevel pwrlevels[KGSL_MAX_PWRLEVELS];
 	unsigned int active_pwrlevel;
-	int requested_pwrlevel;
+	int thermal_pwrlevel;
 	unsigned int num_pwrlevels;
 	unsigned int interval_timeout;
 	struct regulator *gpu_reg;
 	uint32_t pcl;
 	unsigned int nap_allowed;
 	struct kgsl_yamato_context *suspended_ctxt;
+	const char *regulator_name;
+	const char *irq_name;
+	const char *src_clk_name;
+	bool pwrrail_first;
+	s64 time;
+	unsigned int no_switch_cnt;
+	unsigned int idle_pass;
 };
 
 void kgsl_pwrctrl_clk(struct kgsl_device *device, unsigned int pwrflag);
