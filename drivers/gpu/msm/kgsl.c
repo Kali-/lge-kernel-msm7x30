@@ -1517,6 +1517,13 @@ static long kgsl_ioctl_map_user_mem(struct kgsl_device_private *dev_priv,
 			(void *)(vstart + (param->offset & PAGE_MASK));
 	else
 		entry->memdesc.hostptr = __va(entry->memdesc.physaddr);
+
+	if (entry->memdesc.physaddr == 0) {
+		KGSL_CORE_ERR("Error: memdesc.phyaddr is null.\n");
+		result = -EINVAL;
+		goto error_free_entry;
+	}
+
 	if (param->memtype != KGSL_USER_MEM_TYPE_PMEM) {
 		result = kgsl_mmu_map(private->pagetable,
 				entry->memdesc.physaddr, entry->memdesc.size,
@@ -1531,6 +1538,7 @@ static long kgsl_ioctl_map_user_mem(struct kgsl_device_private *dev_priv,
 				&entry->memdesc.gpuaddr,
 				KGSL_MEMFLAGS_ALIGN4K | KGSL_MEMFLAGS_CONPHYS);
 	}
+
 	if (result)
 		goto error_free_entry;
 
