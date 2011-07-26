@@ -1204,25 +1204,13 @@ static long kgsl_ioctl_sharedmem_free(struct kgsl_device_private *dev_priv,
 static struct vm_area_struct *kgsl_get_vma_from_start_addr(unsigned int addr)
 {
 	struct vm_area_struct *vma;
-	int len;
 
 	down_read(&current->mm->mmap_sem);
 	vma = find_vma(current->mm, addr);
 	up_read(&current->mm->mmap_sem);
-	if (!vma) {
+	if (!vma)
 		KGSL_CORE_ERR("find_vma(%x) failed\n", addr);
-		return NULL;
-	}
-	len = vma->vm_end - vma->vm_start;
-	if (vma->vm_pgoff || !KGSL_IS_PAGE_ALIGNED(len) ||
-	  !KGSL_IS_PAGE_ALIGNED(vma->vm_start)) {
-		KGSL_CORE_ERR("address %x is not aligned\n", addr);
-		return NULL;
-	}
-	if (vma->vm_start != addr) {
-		KGSL_CORE_ERR("vma address does not match mmap address\n");
-		return NULL;
-	}
+
 	return vma;
 }
 
@@ -1255,7 +1243,34 @@ kgsl_ioctl_sharedmem_from_vmalloc(struct kgsl_device_private *dev_priv,
 		result = -EINVAL;
 		goto error;
 	}
-	len = vma->vm_end - vma->vm_start;
+
+	/*
+	 * If the user specified a length, use it, otherwise try to
+	 * infer the length if the vma region
+	 */
+	if (param->gpuaddr != 0) {
+		len = param->gpuaddr;
+
+	} else {
+		/*
+		 * For this to work, we have to assume the VMA region is only
+		 * for this single allocation.  If it isn't, then bail out
+		 */
+		if (vma->vm_pgoff || (param->hostptr != vma->vm_start)) {
+			KGSL_CORE_ERR("VMA region does not match hostaddr\n");
+			result = -EINVAL;
+			goto error;
+		}
+		len = vma->vm_end - vma->vm_start;
+
+	}
+
+	/* Make sure it fits */
+	if (len == 0 || param->hostptr + len > vma->vm_end) {
+		KGSL_CORE_ERR("Invalid memory allocation length\n");
+		result = -EINVAL;
+		goto error;
+	}
 
 	entry = kzalloc(sizeof(struct kgsl_mem_entry), GFP_KERNEL);
 	if (entry == NULL) {
