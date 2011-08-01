@@ -1022,6 +1022,10 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 			KGSL_CORE_ERR("Unable to find physaddr for"
 				"address: %x\n", address);
 			spin_unlock(&pagetable->lock);
+			/* Increase the stats here for proper accounting in
+			kgsl_mmu_unmap */
+			pagetable->stats.entries += 1;
+			pagetable->stats.mapped += alloc_size;
 			kgsl_mmu_unmap(pagetable, *gpuaddr, range);
 			return -EFAULT;
 		}
