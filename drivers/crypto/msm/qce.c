@@ -29,13 +29,13 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/crypto.h>
+#include <linux/qcedev.h>
 #include <crypto/hash.h>
 #include <crypto/sha.h>
-
 #include <mach/dma.h>
-#include "inc/qce.h"
-#include "inc/qcedev.h"
-#include "inc/qcryptohw.h"
+
+#include "qce.h"
+#include "qcryptohw.h"
 
 /* ADM definitions */
 #define LI_SG_CMD  (1 << 31)    /* last index in the scatter gather cmd */

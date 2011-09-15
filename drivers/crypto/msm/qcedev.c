@@ -33,11 +33,12 @@
 #include <linux/debugfs.h>
 #include <linux/scatterlist.h>
 #include <linux/crypto.h>
+#include <linux/qcedev.h>
 #include <crypto/hash.h>
 #include <mach/board.h>
 #include <mach/scm.h>
-#include "inc/qcedev.h"
-#include "inc/qce.h"
+
+#include "qce.h"
 
 
 #define CACHE_LINE_SIZE 32
@@ -1346,12 +1347,31 @@ static int qcedev_check_cipher_params(struct qcedev_cipher_op_req *req,
 					(req->encklen == QCEDEV_AES_KEY_192) ||
 					(req->encklen == QCEDEV_AES_KEY_256)))
 				goto error;
+		/* if using a byteoffset, make sure it is CTR mode using vbuf */
+		if (req->byteoffset) {
+			if (req->mode != QCEDEV_AES_MODE_CTR)
+				goto error;
+			else { /* if using CTR mode make sure not using Pmem */
+				if (req->use_pmem)
+					goto error;
+			}
+		}
 	}
-
-	if (req->ivlen != 0)
+	/* if using PMEM with non-zero byteoffset, ensure it is in_place_op */
+	if (req->use_pmem) {
+		if (!req->in_place_op)
+			goto error;
+	}
+	/* Ensure zero ivlen for ECB  mode  */
+	if (req->ivlen != 0) {
 		if ((req->mode == QCEDEV_AES_MODE_ECB) ||
 				(req->mode == QCEDEV_DES_MODE_ECB))
 			goto error;
+	} else {
+		if ((req->mode != QCEDEV_AES_MODE_ECB) &&
+				(req->mode != QCEDEV_DES_MODE_ECB))
+			goto error;
+	}
 	return 0;
 error:
 	return -EINVAL;
