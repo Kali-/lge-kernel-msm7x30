@@ -1,0 +1,23 @@
+#menu "NFC device support"
+
+config LGE_NXP_NFC
+	tristate "NXP PN544 support for Near Field Communication"
+	depends on I2C
+	default n
+	help
+	  NXP PN544 chip has a module to support NFC (Near Field
+	  Communication). This option enables the driver to support it.
+
+config LGE_SU610_NFC
+	tristate "SU610 support for NFC"
+	default n
+
+config LGE_NXP_DRIVER_TEST
+	tristate "support for LGE Driver Test"
+	default n
+
+config LGE_NFC_AT
+	tristate "support for LGE AT Command"
+	default n
+	
+#endmenu

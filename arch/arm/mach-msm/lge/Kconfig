@@ -1,0 +1,134 @@
+config MACH_LGE
+	bool
+
+menu "LGE Device-Specific Changes"
+
+menu "LGE Board Selection"
+
+config MACH_MSM8X55_VICTOR
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select MACH_LGE
+	bool "MSM8x55 VICTOR"
+	help
+	  Support for the LGE MSM8x55 VICTOR board.
+
+endmenu
+
+config LGE_DOMESTIC
+	bool "domestic"
+	default n
+	depends on MACH_LGE
+
+config LGE_MODEL_SU610
+	bool "su610"
+	default n
+	depends on MACH_LGE
+
+config LGE_MODEL_KU6100
+	bool "ku6100"
+	default n
+	depends on MACH_LGE
+
+config LGE_MODEL_E739
+	bool "e739"
+	default n
+	depends on MACH_LGE
+
+config LGE_MODEL_E739_REV_A
+	bool "e739 HW rev.A"
+	default n
+	depends on MACH_LGE
+
+config LGE_MODEL_E739_REV_B
+	bool "e739 HW rev.B"
+	default n
+	depends on MACH_LGE
+
+config LGE_MODEL_E739_REV_C
+	bool "e739 HW rev.C"
+	default n
+	depends on MACH_LGE
+
+config LGE_MODEL_E739_REV_D
+	bool "e739 HW rev.D"
+	default n
+	depends on MACH_LGE
+
+config LGE_HEADSET_2GPIO
+    bool
+
+config LGE_HEADSET_MAX14579
+	tristate "LGE GPIO 2 Wire detection driver using MAX14579"
+	default n
+	depends on MACH_LGE
+	select LGE_HEADSET_2GPIO
+	help
+	  LGE GPIO 2 Wire detection driver by using MAX14579
+
+config LGE_PROC_COMM
+	bool "LGE proc_comm protocol"
+	depends on MACH_LGE
+	default N
+	help
+
+	  Support for the LGE proc_comm protocol.
+
+config LGE_SUPPORT_AT_CMD
+	bool "Support LGE AT_CMD system"
+	default n
+	depends on MACH_LGE
+	help
+	 LGE AT_CMD Support
+
+config LGE_ATCMD_TTY
+	bool "Support LGE atcmd bypassing tty"
+	default n
+	help
+	  Support LGE atcmd bypassing tty. "/dev/atcmd-tty0" is back-end tty,
+	  and "dev/atcmd-tty1" is front-end tty. Back-end tty will be interfaced
+	  with portbridge and front-end tty will be interfaced with parser/filter.
+
+config LGE_REPORT_RMT_STORAGE_CLIENT_READY
+   bool "Report that RMT_STORAGE_CLIENT is ready to modem"
+   depends on MACH_LGE
+   default n
+   help 
+     Report that Remote storage client is ready to modem.
+     After this signal modem can call efs_sync().
+     
+
+config LGE_HANDLE_PANIC
+	tristate "Support LGE Kernel Panic Handler"
+	default n
+	depends on MACH_LGE
+	depends on ANDROID_RAM_CONSOLE
+	help
+	  LGE crash handler
+
+config LGE_AUDIO_LOOPBACK
+	bool "Support LGE audio loopback"
+	default n
+	depends on MACH_LGE
+	help
+	 Support LGE audio loopback. 
+
+config LGE_HIDDEN_RESET_PATCH
+    bool "Support LGE hidden reset function"
+	default n
+	depends on MACH_LGE
+	depends on ANDROID_RAM_CONSOLE
+	help
+	 LGE hidden reset function
+
+# START [sangki.hyun@lge.com][dom_testmode] 20100615 LAB1_FW LGE_TEST_MODE {
+config MSM_RPCSERVER_TESTMODE
+	depends on MSM_ONCRPCROUTER
+	default y
+	bool "Testmode events RPC server"
+	help
+	  Support for receiving handset events like headset detect,
+	  headset switch and clamshell state.	  
+# END [sangki.hyun@lge.com][dom_testmode] 20100615 LAB1_FW }
+
+endmenu
