@@ -30,7 +30,11 @@
 * 2011-08-20, Increas SF PMEM(0x1D00000), munyoung.hwang@lge.com
 */
 #define MSM_PMEM_SF_SIZE	0x1D00000
+#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
+#define MSM_FB_SIZE		0x780000
+#else
 #define MSM_FB_SIZE		0x500000
+#endif
 //[LGE_UPDATE_S] taeyol.kim@lge.com 2011-06-27 : To support 720P and VT rotation, one more preview buffer is needed. => need to increase pmem
 #if 0
 #define MSM_PMEM_ADSP_SIZE      0x1800000
