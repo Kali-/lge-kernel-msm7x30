@@ -2428,6 +2428,12 @@ config FB_MSM_LCDC_LGDISPLAY_WVGA_OLED
 	default n
 # LGE_CHANGE_E
 
+config FB_MSM_OVERLAY_WRITEBACK
+	depends on FB_MSM_OVERLAY
+	bool "MDP overlay write back mode enable"
+	---help---
+	  Support for MDP4 OVERLAY write back mode
+
 choice
 	prompt "LCD Panel"
 	default FB_MSM_MDDI_AUTO_DETECT

@@ -34,10 +34,6 @@
 #include <linux/spinlock.h>
 
 #include <linux/fb.h>
-#include <linux/vmalloc.h>
-#include <linux/mm.h>
-#include <linux/firmware.h>
-#include <linux/slab.h>
 
 #include "mdp.h"
 #include "msm_fb.h"
@@ -52,6 +48,8 @@
 int first_pixel_start_x;
 int first_pixel_start_y;
 
+static int writeback_offset;
+
 static struct mdp4_overlay_pipe *lcdc_pipe;
 static struct completion lcdc_comp;
 //[LGE_UPDATE_S] taeyol.kim@lge.com 2011-08-24 : fixed the problme wait4vync is called when mdp lcd is off
@@ -59,12 +57,13 @@ static bool   mdp4_lcdc_on_state;   // taeyol
 //[LGE_UPDATE_E] taeyol.kim@lge.com 2011-08-24
 
 #ifdef CONFIG_LGE_HIDDEN_RESET_PATCH
-/* LGE_CHANGE 
-* add hidden reset module  
-* 2011-07-07, tei.kim@lge.com
-*/
+/* LGE_CHANGE
+ * add hidden reset module
+ * 2011-07-07, tei.kim@lge.com
+ */
 extern int on_hidden_reset;
 #endif
+
 //LGE 110624 ntdeaewan.choi@lge.com
 #ifdef CONFIG_LGE_DOMESTIC
 #ifdef CONFIG_FB_MSM_LOGO
@@ -73,6 +72,7 @@ extern int load_rle_image(char *filename);
 #endif
 #endif
 //LGE 110624 ntdeaewan.choi@lge.com
+
 int mdp_lcdc_on(struct platform_device *pdev)
 {
 	int lcdc_width;
@@ -153,6 +153,15 @@ int mdp_lcdc_on(struct platform_device *pdev)
 			printk(KERN_INFO "%s: format2pipe failed\n", __func__);
 		lcdc_pipe = pipe; /* keep it */
 		init_completion(&lcdc_comp);
+
+		writeback_offset = mdp4_writeback_offset();
+
+		if (writeback_offset > 0) {
+			pipe->blt_base = (ulong)fbi->fix.smem_start;
+			pipe->blt_base += writeback_offset;
+		} else {
+			pipe->blt_base  = 0;
+		}
 	} else {
 		pipe = lcdc_pipe;
 	}
@@ -165,6 +174,7 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	pipe->src_x = 0;
 	pipe->srcp0_addr = (uint32) buf;
 	pipe->srcp0_ystride = fbi->fix.line_length;
+	pipe->bpp = bpp;
 
 	mdp4_overlay_dmap_xy(pipe);
 	mdp4_overlay_dmap_cfg(mfd, 1);
@@ -255,10 +265,11 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	MDP_OUTP(MDP_BASE + LCDC_BASE + 0x24, active_v_end);
 
 	mdp4_overlay_reg_flush(pipe, 1);
+
 //LGE 110624 ntdeaewan.choi@lge.com
 #ifdef CONFIG_LGE_DOMESTIC
 #ifdef CONFIG_FB_MSM_LOGO
-	if (!load_rle_image(INIT_IMAGE_FILE)) ;	/* Flip buffer */
+	if (!load_rle_image(INIT_IMAGE_FILE)) ; /* Flip buffer */
 #endif
 #endif /* CONFIG_LGE_DOMESTIC */
 //LGE 110624 ntdeaewan.choi@lge.com
@@ -296,9 +307,14 @@ int mdp_lcdc_on(struct platform_device *pdev)
 int mdp_lcdc_off(struct platform_device *pdev)
 {
 	int ret = 0;
+	struct msm_fb_data_type *mfd;
 //[LGE_UPDATE_S] taeyol.kim@lge.com 2011-08-24 : fixed the problme wait4vync is called when mdp lcd is off
 	mdp4_lcdc_on_state = FALSE;
 //[LGE_UPDATE_E] taeyol.kim@lge.com 2011-08-24
+
+	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
+
+	mutex_lock(&mfd->dma->ov_mutex);
 
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
@@ -309,6 +325,8 @@ int mdp_lcdc_off(struct platform_device *pdev)
 
 	mdp_histogram_ctrl(FALSE);
 	ret = panel_next_off(pdev);
+
+	mutex_unlock(&mfd->dma->ov_mutex);
 
 	/* delay to make sure the last frame finishes */
 	msleep(16);
@@ -323,75 +341,155 @@ int mdp_lcdc_off(struct platform_device *pdev)
 #endif
 
 //[LGE_UPDATE_S] taeyol.kim@lge.com 2011-08-24 : fixed the problme wait4vync is called when mdp lcd is off
-	complete_all(&lcdc_comp);	// taeyol
+	complete_all(&lcdc_comp);       // taeyol
 //[LGE_UPDATE_E] taeyol.kim@lge.com 2011-08-24
 
 	return ret;
 }
 
-int mdp4_lcdc_overlay_blt_offset(int *off)
+static void mdp4_lcdc_blt_ov_update(struct mdp4_overlay_pipe *pipe)
 {
-	if (lcdc_pipe->blt_addr == 0) {
-		*off = -1;
-		return -EINVAL;
-	}
+	uint32 off, addr;
+	int bpp;
+	char *overlay_base;
 
-	*off = 0;
-	return 0;
+
+	if (pipe->blt_addr == 0)
+		return;
+
+
+#ifdef BLT_RGB565
+	bpp = 2; /* overlay ouput is RGB565 */
+#else
+	bpp = 3; /* overlay ouput is RGB888 */
+#endif
+	off = 0;
+	if (pipe->ov_cnt & 0x01)
+		off = pipe->src_height * pipe->src_width * bpp;
+	addr = pipe->blt_addr + off;
+
+	/* overlay 0 */
+	overlay_base = MDP_BASE + MDP4_OVERLAYPROC0_BASE;/* 0x10000 */
+	outpdw(overlay_base + 0x000c, addr);
+	outpdw(overlay_base + 0x001c, addr);
 }
 
-void mdp4_lcdc_overlay_blt(ulong addr)
+static void mdp4_lcdc_blt_dmap_update(struct mdp4_overlay_pipe *pipe)
 {
-	unsigned long flag;
+	uint32 off, addr;
+	int bpp;
 
-	spin_lock_irqsave(&mdp_spin_lock, flag);
-	lcdc_pipe->blt_addr = addr;
-	lcdc_pipe->blt_cnt = 0;
-	spin_unlock_irqrestore(&mdp_spin_lock, flag);
+	if (pipe->blt_addr == 0)
+		return;
 
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-	MDP_OUTP(MDP_BASE + LCDC_BASE, 0);	/* stop lcdc */
-	msleep(50);
-	mdp4_overlayproc_cfg(lcdc_pipe);
-	mdp4_overlay_dmap_xy(lcdc_pipe);
-	MDP_OUTP(MDP_BASE + LCDC_BASE, 1);	/* start lcdc */
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+
+#ifdef BLT_RGB565
+	bpp = 2; /* overlay ouput is RGB565 */
+#else
+	bpp = 3; /* overlay ouput is RGB888 */
+#endif
+	off = 0;
+	if (pipe->dmap_cnt & 0x01)
+		off = pipe->src_height * pipe->src_width * bpp;
+	addr = pipe->blt_addr + off;
+
+	/* dmap */
+	MDP_OUTP(MDP_BASE + 0x90008, addr);
 }
 
-void mdp4_overlay_lcdc_wait4vsync(struct msm_fb_data_type *mfd)
+/*
+ * mdp4_overlay_lcdc_wait4event:
+ * INTR_DMA_P_DONE and INTR_PRIMARY_VSYNC event only
+ * no INTR_OVERLAY0_DONE event allowed.
+ */
+static void mdp4_overlay_lcdc_wait4event(struct msm_fb_data_type *mfd,
+					int intr_done)
 {
 	unsigned long flag;
+	unsigned int data;
 
-	 /* enable irq */
+	data = inpdw(MDP_BASE + LCDC_BASE);
+	data &= 0x01;
+	if (data == 0)	/* timing generator disabled */
+		return;
+
 	spin_lock_irqsave(&mdp_spin_lock, flag);
-	mdp_enable_irq(MDP_DMA2_TERM);	/* enable intr */
 	INIT_COMPLETION(lcdc_comp);
 	mfd->dma->waiting = TRUE;
-	outp32(MDP_INTR_CLEAR, INTR_PRIMARY_VSYNC);
-	mdp_intr_mask |= INTR_PRIMARY_VSYNC;
+	outp32(MDP_INTR_CLEAR, intr_done);
+	mdp_intr_mask |= intr_done;
 	outp32(MDP_INTR_ENABLE, mdp_intr_mask);
+	mdp_enable_irq(MDP_DMA2_TERM);  /* enable intr */
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 //[LGE_UPDATE_S] taeyol.kim@lge.com 2011-08-24 : fixed the problme wait4vync is called when mdp lcd is off
-	if( mdp4_lcdc_on_state ){
-//[LGE_UPDATE_E] taeyol.kim@lge.com 2011-08-24		
-		wait_for_completion_killable(&lcdc_comp);
-	}
+	if (mdp4_lcdc_on_state)
+//[LGE_UPDATE_E] taeyol.kim@lge.com 2011-08-24         
+		wait_for_completion(&lcdc_comp);
 	mdp_disable_irq(MDP_DMA2_TERM);
 }
 
-void mdp4_overlay_vsync_push(struct msm_fb_data_type *mfd,
+void mdp4_overlay_lcdc_dma_busy_wait(struct msm_fb_data_type *mfd)
+{
+	unsigned long flag;
+	int need_wait = 0;
+
+	pr_debug("%s: start pid=%d\n", __func__, current->pid);
+
+	spin_lock_irqsave(&mdp_spin_lock, flag);
+	if (mfd->dma->busy == TRUE) {
+		INIT_COMPLETION(mfd->dma->comp);
+		need_wait++;
+	}
+	spin_unlock_irqrestore(&mdp_spin_lock, flag);
+
+	if (need_wait) {
+		/* wait until DMA finishes the current job */
+		pr_debug("%s: pending pid=%d\n", __func__, current->pid);
+		wait_for_completion(&mfd->dma->comp);
+	}
+	pr_debug("%s: done pid=%d\n", __func__, current->pid);
+}
+
+void mdp4_overlay_lcdc_set_perf(struct msm_fb_data_type *mfd)
+{
+	mdp4_overlay_lcdc_wait4event(mfd, INTR_DMA_P_DONE);
+	/* change mdp clk while mdp is idle */
+	mdp4_set_perf_level();
+}
+
+void mdp4_overlay_lcdc_vsync_push(struct msm_fb_data_type *mfd,
 			struct mdp4_overlay_pipe *pipe)
 {
+	unsigned long flag;
+
 //[LGE_UPDATE_S] taeyol.kim@lge.com 2011-08-24 : fixed the problme wait4vync is called when mdp lcd is off
-	if( !mdp4_lcdc_on_state )
+	if (!mdp4_lcdc_on_state)
 		return;
 //[LGE_UPDATE_E] taeyol.kim@lge.com 2011-08-24
 
-	mdp4_overlay_reg_flush(pipe, 1);
 	if (pipe->flags & MDP_OV_PLAY_NOWAIT)
 		return;
 
-	mdp4_overlay_lcdc_wait4vsync(mfd);
+	if (lcdc_pipe->blt_addr) {
+		mdp4_overlay_lcdc_dma_busy_wait(mfd);
+
+		mdp4_lcdc_blt_ov_update(lcdc_pipe);
+		lcdc_pipe->ov_cnt++;
+
+		spin_lock_irqsave(&mdp_spin_lock, flag);
+		outp32(MDP_INTR_CLEAR, INTR_OVERLAY0_DONE);
+		mdp_intr_mask |= INTR_OVERLAY0_DONE;
+		outp32(MDP_INTR_ENABLE, mdp_intr_mask);
+		mdp_enable_irq(MDP_OVERLAY0_TERM);
+		mfd->dma->busy = TRUE;
+		mb();	/* make sure all registers updated */
+		spin_unlock_irqrestore(&mdp_spin_lock, flag);
+		outpdw(MDP_BASE + 0x0004, 0); /* kickoff overlay engine */
+		mb();
+		mdp4_overlay_lcdc_wait4event(mfd, INTR_DMA_P_DONE);
+	} else {
+		mdp4_overlay_lcdc_wait4event(mfd, INTR_PRIMARY_VSYNC);
+	}
 }
 
 /*
@@ -403,11 +501,29 @@ void mdp4_primary_vsync_lcdc(void)
 }
 
 /*
- * mdp4_overlay0_done_lcdc: called from isr
+ * mdp4_dma_p_done_lcdc: called from isr
  */
-void mdp4_overlay0_done_lcdc(void)
+void mdp4_dma_p_done_lcdc(void)
 {
 	complete_all(&lcdc_comp);
+}
+
+/*
+ * mdp4_overlay0_done_lcdc: called from isr
+ */
+void mdp4_overlay0_done_lcdc(struct mdp_dma_data *dma)
+{
+	spin_lock(&mdp_spin_lock);
+	if (lcdc_pipe->blt_addr == 0) {
+		spin_unlock(&mdp_spin_lock);
+		return;
+	}
+	dma->busy = FALSE;
+	mdp4_lcdc_blt_dmap_update(lcdc_pipe);
+	lcdc_pipe->dmap_cnt++;
+	mdp_disable_irq_nosync(MDP_OVERLAY0_TERM);
+	spin_unlock(&mdp_spin_lock);
+	complete(&dma->comp);
 }
 
 void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
@@ -416,11 +532,12 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 	uint8 *buf;
 	int bpp;
 	struct mdp4_overlay_pipe *pipe;
+
 #ifdef CONFIG_LGE_HIDDEN_RESET_PATCH
-/* LGE_CHANGE 
-* add hidden reset module  
-* 2011-07-07, tei.kim@lge.com
-*/
+	/* LGE_CHANGE
+	 * add hidden reset module
+	 * 2011-07-07, tei.kim@lge.com
+	 */
 	unsigned int tmp;
 #endif
 
@@ -430,22 +547,20 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 	/* no need to power on cmd block since it's lcdc mode */
 	bpp = fbi->var.bits_per_pixel / 8;
 #ifdef CONFIG_LGE_HIDDEN_RESET_PATCH
-/* LGE_CHANGE 
-* add hidden reset module  
-* 2011-07-07, tei.kim@lge.com
-*/
+	/* LGE_CHANGE
+	 * add hidden reset module
+	 * 2011-07-07, tei.kim@lge.com
+	 */
 	if (on_hidden_reset) {
 		tmp = (unsigned int)lge_get_fb_copy_virt_rgb888_addr();
 		buf = (unsigned char *)__pa((unsigned int)tmp);
 	} else {
 		buf = (uint8 *) fbi->fix.smem_start;
-		buf += fbi->var.xoffset * bpp +
-			fbi->var.yoffset * fbi->fix.line_length;
+		buf += fbi->var.xoffset * bpp + fbi->var.yoffset * fbi->fix.line_length;
 	}
 #else
 	buf = (uint8 *) fbi->fix.smem_start;
-	buf += fbi->var.xoffset * bpp +
-		fbi->var.yoffset * fbi->fix.line_length;
+	buf += fbi->var.xoffset * bpp + fbi->var.yoffset * fbi->fix.line_length;
 #endif
 
 	mutex_lock(&mfd->dma->ov_mutex);
@@ -453,8 +568,93 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 	pipe = lcdc_pipe;
 	pipe->srcp0_addr = (uint32) buf;
 	mdp4_overlay_rgb_setup(pipe);
-	mdp4_overlay_vsync_push(mfd, pipe);
-	mdp4_stat.kickoff_lcdc++;
-	mdp4_overlay_resource_release();
+	mdp4_overlay_reg_flush(pipe, 1);
+	mdp4_overlay_lcdc_vsync_push(mfd, pipe);
 	mutex_unlock(&mfd->dma->ov_mutex);
+	mdp4_stat.kickoff_lcdc++;
 }
+
+#ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
+/*
+ * make sure the MIPI_DSI_WRITEBACK_SIZE defined at boardfile
+ * has enough space h * w * 3 * 2
+ */
+static void mdp4_lcdc_do_blt(struct msm_fb_data_type *mfd, int enable)
+{
+	unsigned long flag;
+	int change = 0;
+
+	if (lcdc_pipe->blt_base == 0) {
+		pr_debug("%s: no blt_base assigned\n", __func__);
+		return;
+	}
+
+	spin_lock_irqsave(&mdp_spin_lock, flag);
+	if (enable && lcdc_pipe->blt_addr == 0) {
+		lcdc_pipe->blt_addr = lcdc_pipe->blt_base;
+		change++;
+		lcdc_pipe->blt_cnt = 0;
+		lcdc_pipe->ov_cnt = 0;
+		lcdc_pipe->dmap_cnt = 0;
+	} else if (enable == 0 && lcdc_pipe->blt_addr) {
+		lcdc_pipe->blt_addr = 0;
+		change++;
+	}
+	pr_info("%s: blt_addr=%x\n", __func__, (int)lcdc_pipe->blt_addr);
+	spin_unlock_irqrestore(&mdp_spin_lock, flag);
+
+	if (!change)
+		return;
+
+	mdp4_overlay_lcdc_wait4event(mfd, INTR_DMA_P_DONE);
+	MDP_OUTP(MDP_BASE + LCDC_BASE, 0);	/* stop lcdc */
+	msleep(20);
+	mdp4_overlayproc_cfg(lcdc_pipe);
+	mdp4_overlay_dmap_xy(lcdc_pipe);
+	MDP_OUTP(MDP_BASE + LCDC_BASE, 1);	/* start lcdc */
+}
+
+int mdp4_lcdc_overlay_blt_offset(struct msm_fb_data_type *mfd,
+					struct msmfb_overlay_blt *req)
+{
+	req->offset = writeback_offset;
+	req->width = lcdc_pipe->src_width;
+	req->height = lcdc_pipe->src_height;
+	req->bpp = lcdc_pipe->bpp;
+
+	return sizeof(*req);
+}
+
+void mdp4_lcdc_overlay_blt(struct msm_fb_data_type *mfd,
+					struct msmfb_overlay_blt *req)
+{
+	mdp4_lcdc_do_blt(mfd, req->enable);
+}
+
+void mdp4_lcdc_overlay_blt_start(struct msm_fb_data_type *mfd)
+{
+	mdp4_lcdc_do_blt(mfd, 1);
+}
+
+void mdp4_lcdc_overlay_blt_stop(struct msm_fb_data_type *mfd)
+{
+	mdp4_lcdc_do_blt(mfd, 0);
+}
+#else
+int mdp4_lcdc_overlay_blt_offset(struct msm_fb_data_type *mfd,
+					struct msmfb_overlay_blt *req)
+{
+	return 0;
+}
+void mdp4_lcdc_overlay_blt(struct msm_fb_data_type *mfd,
+					struct msmfb_overlay_blt *req)
+{
+	return;
+}
+void mdp4_lcdc_overlay_blt_start(struct msm_fb_data_type *mfd)
+{
+}
+void mdp4_lcdc_overlay_blt_stop(struct msm_fb_data_type *mfd)
+{
+}
+#endif
