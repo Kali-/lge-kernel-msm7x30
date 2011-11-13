@@ -940,7 +940,7 @@ static void __init msm7x30_init_mmc(void)
 	sdcc_vreg_data[2].level = 1800;
 
 /* LGE_CHANGE_S, [gsm-wifi@lge.com], 2011-02-16, <Add BCM4330> */
-#if defined(CONFIG_LGE_BCM432X_PATCH)
+//#if defined(CONFIG_LGE_BCM432X_PATCH)
 	/* GPIO config */
 	gpio_tlmm_config(GPIO_CFG(CONFIG_BCM4330_GPIO_WL_RESET, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	gpio_set_value(CONFIG_BCM4330_GPIO_WL_RESET, 0);
@@ -952,10 +952,10 @@ static void __init msm7x30_init_mmc(void)
 
 	/* Enable RESET IRQ for wlan card detect */
 	enable_irq(gpio_to_irq(CONFIG_BCM4330_GPIO_WL_RESET));
-#else /* qualcomm or google */
-	msm_sdcc_setup_gpio(3, 1);
-	msm_add_sdcc(3, &msm7x30_sdc3_data);
-#endif /* CONFIG_LGE_BCM432X_PATCH */
+//#else /* qualcomm or google */
+//	msm_sdcc_setup_gpio(3, 1);
+//	msm_add_sdcc(3, &msm7x30_sdc3_data);
+//#endif /* CONFIG_LGE_BCM432X_PATCH */
 /* LGE_CHANGE_E, [gsm-wifi@lge.com], 2011-02-16, <Add BCM4330> */
 #endif
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
