@@ -196,10 +196,10 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 	struct kgsl_device *device = (struct kgsl_device *) data;
 	struct kgsl_g12_device *g12_device = KGSL_G12_DEVICE(device);
 
-	kgsl_g12_regread(device, ADDR_VGC_IRQSTATUS >> 2, &status);
+	kgsl_g12_regread_isr(device, ADDR_VGC_IRQSTATUS >> 2, &status);
 
 	if (status & GSL_VGC_INT_MASK) {
-		kgsl_g12_regwrite(device,
+		kgsl_g12_regwrite_isr(device,
 			ADDR_VGC_IRQSTATUS >> 2, status & GSL_VGC_INT_MASK);
 
 		result = IRQ_HANDLED;
@@ -211,7 +211,7 @@ irqreturn_t kgsl_g12_isr(int irq, void *data)
 		if (status & REG_VGC_IRQSTATUS__G2D_MASK) {
 			int count;
 
-			kgsl_g12_regread(device,
+			kgsl_g12_regread_isr(device,
 					 ADDR_VGC_IRQ_ACTIVE_CNT >> 2,
 					 &count);
 
@@ -420,6 +420,7 @@ static int kgsl_g12_stop(struct kgsl_device *device)
 	kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_CLK_OFF);
 	if (device->pwrctrl.pwrrail_first)
 		kgsl_pwrctrl_pwrrail(device, KGSL_PWRFLAGS_POWER_OFF);
+
 	return 0;
 }
 
@@ -632,11 +633,22 @@ void kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
 	_g12_regread(device, offsetwords, value);
 }
 
+void kgsl_g12_regread_isr(struct kgsl_device *device, unsigned int offsetwords,
+				unsigned int *value)
+{
+	_g12_regread(device, offsetwords, value);
+}
+
 void kgsl_g12_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int value)
 {
-
 	kgsl_pre_hwaccess(device);
+	_g12_regwrite(device, offsetwords, value);
+}
+
+void kgsl_g12_regwrite_isr(struct kgsl_device *device, unsigned int offsetwords,
+				unsigned int value)
+{
 	_g12_regwrite(device, offsetwords, value);
 }
 
@@ -756,6 +768,8 @@ static void kgsl_g12_getfunctable(struct kgsl_functable *ftbl)
 		return;
 	ftbl->device_regread = kgsl_g12_regread;
 	ftbl->device_regwrite = kgsl_g12_regwrite;
+	ftbl->device_regread_isr = kgsl_g12_regread_isr;
+	ftbl->device_regwrite_isr = kgsl_g12_regwrite_isr;
 	ftbl->device_setstate = kgsl_g12_setstate;
 	ftbl->device_idle = kgsl_g12_idle;
 	ftbl->device_isidle = kgsl_g12_isidle;

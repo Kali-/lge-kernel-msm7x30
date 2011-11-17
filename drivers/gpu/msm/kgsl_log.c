@@ -133,6 +133,7 @@ DEFINE_SIMPLE_ATTRIBUTE(kgsl_cff_dump_enable_fops, kgsl_cff_dump_enable_get,
 static int kgsl_dbgfs_open(struct inode *inode, struct file *file)
 {
 	file->f_mode &= ~(FMODE_PREAD | FMODE_PWRITE);
+	file->private_data = inode->i_private;
 	return 0;
 }
 
@@ -168,7 +169,7 @@ static ssize_t kgsl_ib_dump_read(
 	loff_t *ppos)
 {
 	int i, count = kgsl_ib_size, remaining, pos = 0, tot = 0, ss;
-	struct kgsl_device *device = kgsl_get_device(KGSL_DEVICE_YAMATO);
+	struct kgsl_device *device = file->private_data;
 	const int rowc = 32;
 	unsigned int pt_base, ib_memsize;
 	uint8_t *base_addr;
@@ -278,7 +279,7 @@ static ssize_t kgsl_istore_read(
 	loff_t *ppos)
 {
 	int i, count = KGSL_ISTORE_LENGTH, remaining, pos = 0, tot = 0;
-	struct kgsl_device *device = kgsl_get_device(KGSL_DEVICE_YAMATO);
+	struct kgsl_device *device = file->private_data;
 	const int rowc = 8;
 
 	if (!ppos || !device)
@@ -326,12 +327,12 @@ static const struct file_operations kgsl_istore_fops = {
 typedef void (*reg_read_init_t)(struct kgsl_device *device);
 typedef void (*reg_read_fill_t)(struct kgsl_device *device, int i,
 	unsigned int *vals, int linec);
-static ssize_t kgsl_reg_read(int count, reg_read_init_t reg_read_init,
+static ssize_t kgsl_reg_read(struct kgsl_device *device, int count,
+	reg_read_init_t reg_read_init,
 	reg_read_fill_t reg_read_fill, const char *prefix, char __user *buff,
 	loff_t *ppos)
 {
 	int i, remaining;
-	struct kgsl_device *device = kgsl_get_device(KGSL_DEVICE_YAMATO);
 	const int rowc = 8;
 
 	if (!ppos || *ppos || !device)
@@ -385,8 +386,9 @@ static ssize_t kgsl_sx_debug_read(
 	size_t buff_count,
 	loff_t *ppos)
 {
-	return kgsl_reg_read(0x1B, kgsl_sx_reg_read_init, kgsl_sx_reg_read_fill,
-		"SX: %02x: ", buff, ppos);
+	struct kgsl_device *device = file->private_data;
+	return kgsl_reg_read(device, 0x1B, kgsl_sx_reg_read_init,
+			     kgsl_sx_reg_read_fill, "SX: %02x: ", buff, ppos);
 }
 
 static const struct file_operations kgsl_sx_debug_fops = {
@@ -418,7 +420,9 @@ static ssize_t kgsl_cp_debug_read(
 	size_t buff_count,
 	loff_t *ppos)
 {
-	return kgsl_reg_read(20, kgsl_cp_reg_read_init, kgsl_cp_reg_read_fill,
+	struct kgsl_device *device = file->private_data;
+	return kgsl_reg_read(device, 20, kgsl_cp_reg_read_init,
+		kgsl_cp_reg_read_fill,
 		"CP: %02x: ", buff, ppos);
 }
 
@@ -450,7 +454,9 @@ static ssize_t kgsl_mh_debug_read(
 	size_t buff_count,
 	loff_t *ppos)
 {
-	return kgsl_reg_read(0x40, kgsl_mh_reg_read_init, kgsl_mh_reg_read_fill,
+	struct kgsl_device *device = file->private_data;
+	return kgsl_reg_read(device, 0x40, kgsl_mh_reg_read_init,
+		kgsl_mh_reg_read_fill,
 		"MH: %02x: ", buff, ppos);
 }
 
@@ -501,10 +507,6 @@ int kgsl_debug_init(struct dentry *dir)
 				&kgsl_cache_enable_fops);
 #endif
 
-	debugfs_create_file("cff_dump", 0644, dent, 0,
-			    &kgsl_cff_dump_enable_fops);
-
-#endif /* CONFIG_DEBUG_FS */
 	return 0;
 }
 #else

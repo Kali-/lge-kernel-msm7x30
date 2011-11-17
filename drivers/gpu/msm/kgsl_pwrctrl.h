@@ -53,12 +53,16 @@
 #define KGSL_PWRLEVEL_NOMINAL 1
 #define KGSL_MAX_CLKS 5
 
-enum kgsl_clk_freq {
-	KGSL_AXI_HIGH = 0,
-	KGSL_MIN_FREQ = 1,
-	KGSL_DEFAULT_FREQ = 2,
-	KGSL_MAX_FREQ = 3,
-	KGSL_NUM_FREQ = 4
+struct platform_device;
+
+struct kgsl_busy {
+	struct timeval start;
+	struct timeval stop;
+	int on_time;
+	int time;
+	int on_time_old;
+	int time_old;
+	unsigned int no_nap_cnt;
 };
 
 struct kgsl_pwrctrl {
@@ -66,11 +70,7 @@ struct kgsl_pwrctrl {
 	int have_irq;
 	unsigned int pwr_rail;
 	struct clk *ebi1_clk;
-	struct clk *grp_clk;
-	struct clk *grp_pclk;
-	struct clk *grp_src_clk;
-	struct clk *imem_clk;
-	struct clk *imem_pclk;
+	struct clk *grp_clks[KGSL_MAX_CLKS];
 	unsigned int power_flags;
 	struct kgsl_pwrlevel pwrlevels[KGSL_MAX_PWRLEVELS];
 	unsigned int active_pwrlevel;
@@ -89,6 +89,7 @@ struct kgsl_pwrctrl {
 	unsigned int no_switch_cnt;
 	unsigned int skip_cnt;
 	unsigned int idle_pass;
+	struct kgsl_busy busy;
 };
 
 void kgsl_pwrctrl_clk(struct kgsl_device *device, unsigned int pwrflag);

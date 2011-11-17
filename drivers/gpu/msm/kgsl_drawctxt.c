@@ -652,8 +652,7 @@ static unsigned int *build_gmem2sys_cmds(struct kgsl_device *device,
 	unsigned int *start = cmds;
 	/* Calculate the new offset based on the adjusted base */
 	unsigned int bytesperpixel = format2bytesperpixel[shadow->format];
-	unsigned int addr =
-	    (shadow->gmemshadow.gpuaddr + shadow->offset * bytesperpixel);
+	unsigned int addr = shadow->gmemshadow.gpuaddr;
 	unsigned int offset = (addr - (addr & 0xfffff000)) / bytesperpixel;
 
 	/* Store TP0_CHICKEN register */
@@ -968,10 +967,7 @@ static unsigned int *build_sys2gmem_cmds(struct kgsl_device *device,
 	cmds[0] |= (shadow->pitch >> 5) << 22;
 	cmds[1] |=
 	    shadow->gmemshadow.gpuaddr | surface_format_table[shadow->format];
-	cmds[2] |=
-	    (shadow->width + shadow->offset_x - 1) | (shadow->height +
-						      shadow->offset_y -
-						      1) << 13;
+	cmds[2] |= (shadow->width - 1) | (shadow->height - 1) << 13;
 	cmds += SYS2GMEM_TEX_CONST_LEN;
 
 	/* program surface info */
@@ -1241,18 +1237,15 @@ static void build_regrestore_cmds(struct kgsl_device *device,
 static void set_gmem_copy_quad(struct gmem_shadow_t *shadow)
 {
 	/* set vertex buffer values */
-	gmem_copy_quad[1] = uint2float(shadow->height + shadow->gmem_offset_y);
-	gmem_copy_quad[3] = uint2float(shadow->width + shadow->gmem_offset_x);
-	gmem_copy_quad[4] = uint2float(shadow->height + shadow->gmem_offset_y);
-	gmem_copy_quad[9] = uint2float(shadow->width + shadow->gmem_offset_x);
+	gmem_copy_quad[1] = uint2float(shadow->height);
+	gmem_copy_quad[3] = uint2float(shadow->width);
+	gmem_copy_quad[4] = uint2float(shadow->height);
+	gmem_copy_quad[9] = uint2float(shadow->width);
 
-	gmem_copy_quad[0] = uint2float(shadow->gmem_offset_x);
-	gmem_copy_quad[6] = uint2float(shadow->gmem_offset_x);
-	gmem_copy_quad[7] = uint2float(shadow->gmem_offset_y);
-	gmem_copy_quad[10] = uint2float(shadow->gmem_offset_y);
-
-	BUG_ON(shadow->offset_x);
-	BUG_ON(shadow->offset_y);
+	gmem_copy_quad[0] = uint2float(0);
+	gmem_copy_quad[6] = uint2float(0);
+	gmem_copy_quad[7] = uint2float(0);
+	gmem_copy_quad[10] = uint2float(0);
 
 	memcpy(shadow->quad_vertices.hostptr, gmem_copy_quad, QUAD_LEN << 2);
 
@@ -1469,7 +1462,6 @@ create_gmem_shadow(struct kgsl_yamato_device *yamato_device,
 {
 	struct kgsl_device *device = &yamato_device->dev;
 	int result;
-	int i;
 
 	config_gmemsize(&drawctxt->context_gmem_shadow,
 			yamato_device->gmemspace.sizebytes);
@@ -1508,42 +1500,12 @@ create_gmem_shadow(struct kgsl_yamato_device *yamato_device,
 	    build_sys2gmem_cmds(device, drawctxt, ctx,
 				&drawctxt->context_gmem_shadow);
 
-	for (i = 0; i < KGSL_MAX_GMEM_SHADOW_BUFFERS; i++) {
-		build_quad_vtxbuff(drawctxt, ctx,
-				   &drawctxt->user_gmem_shadow[i]);
-
-		drawctxt->user_gmem_shadow[i].gmem_save_commands = ctx->cmd;
-		ctx->cmd =
-		    build_gmem2sys_cmds(device, drawctxt, ctx,
-					&drawctxt->user_gmem_shadow[i]);
-
-		drawctxt->user_gmem_shadow[i].gmem_restore_commands = ctx->cmd;
-		ctx->cmd =
-		    build_sys2gmem_cmds(device, drawctxt, ctx,
-					&drawctxt->user_gmem_shadow[i]);
-	}
-
 	kgsl_cache_range_op((unsigned int)
 			    drawctxt->context_gmem_shadow.gmemshadow.hostptr,
 			    drawctxt->context_gmem_shadow.size,
 			    KGSL_MEMFLAGS_VMALLOC_MEM
 			    | KGSL_MEMFLAGS_CACHE_FLUSH);
 
-	return 0;
-}
-
-/* init draw context */
-
-int kgsl_drawctxt_init(struct kgsl_device *device)
-{
-	return 0;
-}
-
-/* close draw context */
-int kgsl_drawctxt_close(struct kgsl_device *device)
-{
-	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
-	yamato_device->drawctxt_active = NULL;
 	return 0;
 }
 
@@ -1575,9 +1537,6 @@ kgsl_drawctxt_create(struct kgsl_device_private *dev_priv, uint32_t flags,
 	/* Save the shader instruction memory on context switching */
 	drawctxt->flags |= CTXT_FLAGS_SHADER_SAVE;
 
-	memset(drawctxt->user_gmem_shadow, 0,
-			sizeof(struct gmem_shadow_t) *
-			KGSL_MAX_GMEM_SHADOW_BUFFERS);
 	memset(&drawctxt->context_gmem_shadow.gmemshadow,
 			0, sizeof(struct kgsl_memdesc));
 
@@ -1633,110 +1592,6 @@ int kgsl_drawctxt_destroy(struct kgsl_device *device,
 	return 0;
 }
 
-/* Binds a user specified buffer as GMEM shadow area */
-int kgsl_drawctxt_bind_gmem_shadow(struct kgsl_yamato_device *yamato_device,
-		struct kgsl_context *context,
-		const struct kgsl_gmem_desc *gmem_desc,
-		unsigned int shadow_x,
-		unsigned int shadow_y,
-		const struct kgsl_buffer_desc
-		*shadow_buffer, unsigned int buffer_id)
-{
-	struct kgsl_device *device = &yamato_device->dev;
-	struct kgsl_yamato_context *drawctxt = context->devctxt;
-	/* Shadow struct being modified */
-	struct gmem_shadow_t *shadow;
-	unsigned int i;
-
-	if (device->flags & KGSL_FLAGS_SAFEMODE)
-		/* No need to bind any buffers since safe mode
-		* skips context switch */
-		return 0;
-
-	if (drawctxt == NULL)
-		return -EINVAL;
-
-	shadow = &drawctxt->user_gmem_shadow[buffer_id];
-
-	if (!shadow_buffer->enabled) {
-		/* Disable shadow */
-		KGSL_MEM_ERR("shadow is disabled in bind_gmem\n");
-		shadow->gmemshadow.size = 0;
-	} else {
-		/* Binding to a buffer */
-		unsigned int width, height;
-
-		BUG_ON(gmem_desc->x % 2); /* Needs to be a multiple of 2 */
-		BUG_ON(gmem_desc->y % 2);  /* Needs to be a multiple of 2 */
-		BUG_ON(gmem_desc->width % 2); /* Needs to be a multiple of 2 */
-		/* Needs to be a multiple of 2 */
-		BUG_ON(gmem_desc->height % 2);
-		/* Needs to be a multiple of 32 */
-		BUG_ON(gmem_desc->pitch % 32);
-
-		BUG_ON(shadow_x % 2);  /* Needs to be a multiple of 2 */
-		BUG_ON(shadow_y % 2);  /* Needs to be a multiple of 2 */
-
-		BUG_ON(shadow_buffer->format > COLORX_32_32_32_32_FLOAT);
-		/* Needs to be a multiple of 32 */
-		BUG_ON(shadow_buffer->pitch % 32);
-
-		BUG_ON(buffer_id > KGSL_MAX_GMEM_SHADOW_BUFFERS);
-
-		width = gmem_desc->width;
-		height = gmem_desc->height;
-
-		shadow->width = width;
-		shadow->format = shadow_buffer->format;
-
-		shadow->height = height;
-		shadow->pitch = shadow_buffer->pitch;
-
-		memset(&shadow->gmemshadow, 0, sizeof(struct kgsl_memdesc));
-		shadow->gmemshadow.hostptr = shadow_buffer->hostptr;
-		shadow->gmemshadow.gpuaddr = shadow_buffer->gpuaddr;
-		shadow->gmemshadow.physaddr = shadow->gmemshadow.gpuaddr;
-		shadow->gmemshadow.size = shadow_buffer->size;
-
-		/* Calculate offset */
-		shadow->offset =
-		    (int)(shadow_buffer->pitch) * ((int)shadow_y -
-						   (int)gmem_desc->y) +
-		    (int)shadow_x - (int)gmem_desc->x;
-
-		shadow->offset_x = shadow_x;
-		shadow->offset_y = shadow_y;
-		shadow->gmem_offset_x = gmem_desc->x;
-		shadow->gmem_offset_y = gmem_desc->y;
-
-		shadow->size = shadow->gmemshadow.size;
-
-		shadow->gmem_pitch = gmem_desc->pitch;
-
-		/* Modify quad vertices */
-		set_gmem_copy_quad(shadow);
-
-		/* Idle because we are reading PM override registers */
-		kgsl_yamato_idle(device, KGSL_TIMEOUT_DEFAULT);
-
-		/* Modify commands */
-		build_gmem2sys_cmds(device, drawctxt, NULL, shadow);
-		build_sys2gmem_cmds(device, drawctxt, NULL, shadow);
-
-		/* Release context GMEM shadow if found */
-		kgsl_sharedmem_free(&drawctxt->context_gmem_shadow.gmemshadow);
-	}
-
-	/* Enable GMEM shadowing if we have any of the user buffers enabled */
-	drawctxt->flags &= ~CTXT_FLAGS_GMEM_SHADOW;
-	for (i = 0; i < KGSL_MAX_GMEM_SHADOW_BUFFERS; i++) {
-		if (drawctxt->user_gmem_shadow[i].gmemshadow.size > 0)
-			drawctxt->flags |= CTXT_FLAGS_GMEM_SHADOW;
-	}
-
-	return 0;
-}
-
 /* set bin base offset */
 int kgsl_drawctxt_set_bin_base_offset(struct kgsl_device *device,
 				      struct kgsl_context *context,
@@ -1761,7 +1616,7 @@ kgsl_drawctxt_switch(struct kgsl_yamato_device *yamato_device,
 	struct kgsl_yamato_context *active_ctxt =
 	  yamato_device->drawctxt_active;
 	struct kgsl_device *device = &yamato_device->dev;
-	unsigned int cmds[2];
+	unsigned int cmds[5];
 
 	if (drawctxt) {
 		if (flags & KGSL_CONTEXT_SAVE_GMEM)

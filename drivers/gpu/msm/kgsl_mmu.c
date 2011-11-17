@@ -30,11 +30,7 @@
 #include "kgsl_drawctxt.h"
 #include "kgsl.h"
 #include "kgsl_log.h"
-#include "yamato_reg.h"
-#include "g12_reg.h"
 #include "kgsl_device.h"
-#include "kgsl_g12.h"
-#include "kgsl_yamato.h"
 
 struct kgsl_pte_debug {
 	unsigned int read:1;
@@ -574,23 +570,23 @@ void kgsl_mh_intrcallback(struct kgsl_device *device)
 	unsigned int status = 0;
 	unsigned int reg;
 
-	kgsl_regread(device, device->mmu.reg.interrupt_status, &status);
+	kgsl_regread_isr(device, device->mmu.reg.interrupt_status, &status);
 
 	if (status & MH_INTERRUPT_MASK__AXI_READ_ERROR) {
-		kgsl_regread(device, device->mmu.reg.axi_error, &reg);
+		kgsl_regread_isr(device, device->mmu.reg.axi_error, &reg);
 		KGSL_MEM_CRIT(device, "axi read error interrupt: %08x\n", reg);
 	} else if (status & MH_INTERRUPT_MASK__AXI_WRITE_ERROR) {
-		kgsl_regread(device, device->mmu.reg.axi_error, &reg);
+		kgsl_regread_isr(device, device->mmu.reg.axi_error, &reg);
 		KGSL_MEM_CRIT(device, "axi write error interrupt: %08x\n", reg);
 	} else if (status & MH_INTERRUPT_MASK__MMU_PAGE_FAULT) {
-		kgsl_regread(device, device->mmu.reg.page_fault, &reg);
+		kgsl_regread_isr(device, device->mmu.reg.page_fault, &reg);
 		KGSL_MEM_CRIT(device, "mmu page fault interrupt: %08x\n", reg);
 	} else {
 		KGSL_MEM_WARN(device,
 			"bad bits in REG_MH_INTERRUPT_STATUS %08x\n", status);
 	}
 
-	kgsl_regwrite(device, mmu_reg[device->id].interrupt_clear, status);
+	kgsl_regwrite_isr(device, device->mmu.reg.interrupt_clear, status);
 
 	/*TODO: figure out how to handle errror interupts.
 	* specifically, page faults should probably nuke the client that
@@ -693,8 +689,6 @@ static void kgsl_mmu_destroypagetable(struct kgsl_pagetable *pagetable)
 	kgsl_ptpool_free(&kgsl_driver.ptpool, pagetable->base.hostptr);
 
 	kgsl_driver.stats.coherent -= KGSL_PAGETABLE_SIZE;
-
-	kgsl_driver.stats.coherent -= kgsl_driver.ptsize;
 
 	if (pagetable->pool) {
 		gen_pool_destroy(pagetable->pool);
@@ -838,7 +832,7 @@ int kgsl_mmu_start(struct kgsl_device *device)
 	mmu->flags |= KGSL_FLAGS_STARTED;
 
 	/* setup MMU and sub-client behavior */
-	kgsl_regwrite(device, mmu_reg[device->id].config, mmu->config);
+	kgsl_regwrite(device, device->mmu.reg.config, mmu->config);
 
 	/* enable axi interrupts */
 	kgsl_regwrite(device, device->mmu.reg.interrupt_mask,
@@ -848,8 +842,8 @@ int kgsl_mmu_start(struct kgsl_device *device)
 	kgsl_idle(device,  KGSL_TIMEOUT_DEFAULT);
 
 	/* define physical memory range accessible by the core */
-	kgsl_regwrite(device, mmu_reg[device->id].mpu_base, mmu->mpu_base);
-	kgsl_regwrite(device, mmu_reg[device->id].mpu_end,
+	kgsl_regwrite(device, device->mmu.reg.mpu_base, mmu->mpu_base);
+	kgsl_regwrite(device, device->mmu.reg.mpu_end,
 			mmu->mpu_base + mmu->mpu_range);
 
 	/* enable axi interrupts */
@@ -867,7 +861,7 @@ int kgsl_mmu_start(struct kgsl_device *device)
 		 * we'll leave the bottom 32 bytes of the dummyspace for other
 		 * purposes (e.g. use it when dummy read cycles are needed
 		 * for other blocks */
-		kgsl_regwrite(device, mmu_reg[device->id].tran_error,
+		kgsl_regwrite(device, device->mmu.reg.tran_error,
 						mmu->dummyspace.physaddr + 32);
 
 		if (mmu->defaultpagetable == NULL)
@@ -875,9 +869,9 @@ int kgsl_mmu_start(struct kgsl_device *device)
 				kgsl_mmu_getpagetable(KGSL_MMU_GLOBAL_PT);
 		mmu->hwpagetable = mmu->defaultpagetable;
 
-		kgsl_regwrite(device, mmu_reg[device->id].pt_page,
+		kgsl_regwrite(device, device->mmu.reg.pt_page,
 			      mmu->hwpagetable->base.gpuaddr);
-		kgsl_regwrite(device, mmu_reg[device->id].va_range,
+		kgsl_regwrite(device, device->mmu.reg.va_range,
 			      (mmu->hwpagetable->va_base |
 			      (mmu->hwpagetable->va_range >> 16)));
 		status = kgsl_setstate(device, KGSL_MMUFLAGS_TLBFLUSH);
@@ -890,8 +884,8 @@ int kgsl_mmu_start(struct kgsl_device *device)
 	return 0;
 error:
 	/* disable MMU */
-	kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask, 0);
-	kgsl_regwrite(device, mmu_reg[device->id].config, 0x00000000);
+	kgsl_regwrite(device, device->mmu.reg.interrupt_mask, 0);
+	kgsl_regwrite(device, device->mmu.reg.config, 0x00000000);
 	return status;
 }
 
@@ -1041,8 +1035,6 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 		       pagetable->stats.max_mapped);
 
 	mb();
-	dsb();
-	outer_sync();
 
 	/* Invalidate tlb only if current page table used by GPU is the
 	 * pagetable that we used to allocate */
@@ -1092,9 +1084,6 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 	pagetable->stats.mapped -= range;
 
 	mb();
-	dsb();
-	outer_sync();
-
 	spin_unlock(&pagetable->lock);
 
 	gen_pool_free(pagetable->pool, gpuaddr, range);
@@ -1149,8 +1138,8 @@ int kgsl_mmu_stop(struct kgsl_device *device)
 	if (mmu->flags & KGSL_FLAGS_STARTED) {
 		/* disable mh interrupts */
 		/* disable MMU */
-		kgsl_regwrite(device, mmu_reg[device->id].interrupt_mask, 0);
-		kgsl_regwrite(device, mmu_reg[device->id].config, 0x00000000);
+		kgsl_regwrite(device, device->mmu.reg.interrupt_mask, 0);
+		kgsl_regwrite(device, device->mmu.reg.config, 0x00000000);
 
 		mmu->flags &= ~KGSL_FLAGS_STARTED;
 	}
