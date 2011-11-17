@@ -53,6 +53,8 @@
 #define KGSL_FLAGS_RESERVED2   0x00000080
 #define KGSL_FLAGS_SOFT_RESET  0x00000100
 
+#define KGSL_MAX_PWRLEVELS 5
+
 /* device id */
 enum kgsl_deviceid {
 	KGSL_DEVICE_YAMATO	= 0x00000000,
@@ -95,6 +97,8 @@ struct kgsl_devmemstore {
 	unsigned int sbz3;
 	volatile unsigned int ref_wait_ts;
 	unsigned int sbz4;
+	unsigned int current_context;
+	unsigned int sbz5;
 };
 
 #define KGSL_DEVICE_MEMSTORE_OFFSET(field) \
@@ -129,6 +133,7 @@ struct kgsl_shadowprop {
 struct kgsl_pwrlevel {
 	unsigned int gpu_freq;
 	unsigned int bus_freq;
+	unsigned int io_fraction;
 };
 
 struct kgsl_version {
@@ -172,6 +177,8 @@ struct kgsl_clk_data {
 struct kgsl_device_platform_data {
 	struct kgsl_device_pwr_data pwr_data;
 	struct kgsl_clk_data clk;
+	/* imem_clk_name is for 3d only, not used in 2d devices */
+	struct kgsl_grp_clk_name imem_clk_name;
 };
 
 #endif
