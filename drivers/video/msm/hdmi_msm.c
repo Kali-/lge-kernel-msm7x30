@@ -32,6 +32,7 @@
 
 #include "msm_fb.h"
 #include "external_common.h"
+#include "hdmi_msm.h"
 
 #define QFPROM_BASE		((uint32)hdmi_msm_state->qfprom_io)
 #define HDMI_BASE		((uint32)hdmi_msm_state->hdmi_io)
@@ -57,41 +58,7 @@
 
 struct workqueue_struct *hdmi_work_queue;
 
-struct hdmi_msm_state_type {
-	boolean panel_power_on;
-	boolean hpd_initialized;
-#ifdef CONFIG_SUSPEND
-	boolean pm_suspended;
-#endif
-	int hpd_stable;
-	boolean hpd_prev_state;
-	boolean hpd_cable_chg_detected;
-	boolean full_auth_done;
-	boolean hpd_during_auth;
-	struct work_struct hpd_state_work, hpd_read_work;
-	struct timer_list hpd_state_timer;
-	struct completion ddc_sw_done;
-
-#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT
-	boolean hdcp_activating;
-	boolean reauth ;
-	struct work_struct hdcp_reauth_work, hdcp_work;
-	struct completion hdcp_success_done;
-	struct timer_list hdcp_timer;
-#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT */
-
-	int irq;
-	struct msm_hdmi_platform_data *pd;
-	struct clk *hdmi_app_clk;
-	struct clk *hdmi_m_pclk;
-	struct clk *hdmi_s_pclk;
-	void __iomem *qfprom_io;
-	void __iomem *hdmi_io;
-
-	struct external_common_state_type common;
-};
-
-static struct hdmi_msm_state_type *hdmi_msm_state;
+struct hdmi_msm_state_type *hdmi_msm_state;
 
 DEFINE_MUTEX(hdmi_msm_state_mutex);
 EXPORT_SYMBOL(hdmi_msm_state_mutex);
@@ -703,7 +670,7 @@ static const char *hdmi_msm_name(uint32 offset)
 	}
 }
 
-static void __hdmi_outp(uint32 offset, uint32 value)
+void hdmi_outp(uint32 offset, uint32 value)
 {
 	uint32 in_val;
 
@@ -713,23 +680,13 @@ static void __hdmi_outp(uint32 offset, uint32 value)
 		offset, value, in_val, hdmi_msm_name(offset));
 }
 
-static uint32 __hdmi_inp(uint32 offset)
+uint32 __hdmi_inp(uint32 offset)
 {
 	uint32 value = inpdw(HDMI_BASE+offset);
 	DEV_DBG("HDMI[%04x] <= %08x %s\n",
 		offset, value, hdmi_msm_name(offset));
 	return value;
 }
-
-#define HDMI_OUTP_ND(offset, value)	outpdw(HDMI_BASE+(offset), (value))
-#define HDMI_OUTP(offset, value)	__hdmi_outp((offset), (value))
-#define HDMI_INP_ND(offset)		inpdw(HDMI_BASE+(offset))
-#define HDMI_INP(offset)		__hdmi_inp((offset))
-#else /* DEBUG */
-#define HDMI_OUTP_ND(offset, value)	outpdw(HDMI_BASE+(offset), (value))
-#define HDMI_OUTP(offset, value)	outpdw(HDMI_BASE+(offset), (value))
-#define HDMI_INP_ND(offset)		inpdw(HDMI_BASE+(offset))
-#define HDMI_INP(offset)		inpdw(HDMI_BASE+(offset))
 #endif /* DEBUG */
 
 static void hdmi_msm_turn_on(void);
@@ -1205,7 +1162,7 @@ static boolean hdmi_msm_is_dvi_mode(void)
 	return (HDMI_INP_ND(0x0000) & 0x00000002) ? FALSE : TRUE;
 }
 
-static void hdmi_msm_set_mode(boolean power_on)
+void hdmi_msm_set_mode(boolean power_on)
 {
 	uint32 reg_val = 0;
 	if (power_on) {
@@ -2820,7 +2777,7 @@ error:
 	static inline void hdmi_msm_hdcp_enable(void) { return ; }
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT */
 
-static void hdmi_msm_init_phy(int video_format)
+void hdmi_msm_init_phy(int video_format)
 {
 	/* De-serializer delay D/C for non-lbk mode */
 	/* PHY REG0 = (DESER_SEL(0) | DESER_DEL_CTRL(3) | AMUX_OUT_SEL(0)) */
@@ -2890,7 +2847,7 @@ static void hdmi_msm_init_phy(int video_format)
 	HDMI_OUTP_ND(0x0330, 0x13); /*0b00010011*/
 }
 
-static void hdmi_msm_powerdown_phy(void)
+void hdmi_msm_powerdown_phy(void)
 {
 	/* Disable PLL */
 	HDMI_OUTP_ND(0x030C, 0x00);
@@ -3640,7 +3597,7 @@ static void hdmi_msm_switch_3d(boolean on)
 }
 #endif
 
-static int hdmi_msm_clk(int on)
+int hdmi_msm_clk(int on)
 {
 	int rc;
 
@@ -3675,7 +3632,7 @@ static int hdmi_msm_clk(int on)
 	return 0;
 }
 
-static void hdmi_msm_reset_core(void)
+void hdmi_msm_reset_core(void)
 {
 	hdmi_msm_set_mode(FALSE);
 	hdmi_msm_clk(0);
