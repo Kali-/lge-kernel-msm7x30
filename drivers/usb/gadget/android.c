@@ -153,16 +153,7 @@ static const struct usb_descriptor_header *otg_desc[] = {
 };
 
 static struct list_head _functions = LIST_HEAD_INIT(_functions);
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET_FIX
-/* LGE_CHANGE
- * Apply bug fix from google git(refer to Kconfig).
- * 2011-01-12, hyunhui.park@lge.com
- */
 static bool _are_functions_bound;
-#else /* below is original */
-static int _registered_function_count;
-#endif
-
 
 static void android_set_default_product(int product_id);
 
@@ -186,11 +177,6 @@ static struct android_usb_function *get_function(const char *name)
 	return 0;
 }
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET_FIX
-/* LGE_CHANGE
- * Apply bug fix from google git(refer to Kconfig).
- * 2011-01-12, hyunhui.park@lge.com
- */
 static bool are_functions_registered(struct android_dev *dev)
 {
 	char **functions = dev->functions;
@@ -234,7 +220,6 @@ static bool should_bind_functions(struct android_dev *dev)
 
 	return true;
 }
-#endif
 
 static void bind_functions(struct android_dev *dev)
 {
@@ -246,9 +231,6 @@ static void bind_functions(struct android_dev *dev)
 		char *name = *functions++;
 		f = get_function(name);
 		if (f) {
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET
-			lgeusb_debug("binding function %s\n", name);
-#endif
 			f->bind_config(dev->config);
 		} else {
 			printk(KERN_ERR "function %s not found in bind_functions\n", name);
@@ -260,13 +242,7 @@ static void bind_functions(struct android_dev *dev)
 	 * ep->driver_data as needed.
 	 */
 	usb_ep_autoconfig_reset(dev->cdev->gadget);
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET_FIX
-	/* LGE_CHANGE
-	 * Apply bug fix from google git(refer to Kconfig).
-	 * 2011-01-12, hyunhui.park@lge.com
-	 */
 	_are_functions_bound = true;
-#endif
 }
 
 static int __ref android_bind_config(struct usb_configuration *c)
@@ -276,20 +252,9 @@ static int __ref android_bind_config(struct usb_configuration *c)
 	pr_debug("android_bind_config\n");
 	dev->config = c;
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET_FIX
-	/* LGE_CHANGE
-	 * Apply bug fix from google git(refer to Kconfig).
-	 * 2011-01-12, hyunhui.park@lge.com
-	 */
 	if (should_bind_functions(dev)) {
-		lgeusb_debug("bind_functions() is called\n");
 		bind_functions(dev);
 	}
-#else /* below is original */
-	/* bind our functions if they have all registered */
-	if (_registered_function_count == dev->num_functions)
-		bind_functions(dev);
-#endif
 
 	return 0;
 }
@@ -331,13 +296,6 @@ static int product_has_function(struct android_usb_product *p,
 	int i;
 
 	for (i = 0; i < count; i++) {
-
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET_FIX
-		/* LGE_CHANGE
-		 * Apply bug fix from google git(refer to Kconfig).
-		 * 2011-01-12, hyunhui.park@lge.com
-		 */
-
 		/* For functions with multiple instances, usb_function.name
 		 * will have an index appended to the core name (ex: acm0),
 		 * while android_usb_product.functions[i] will only have the
@@ -345,9 +303,6 @@ static int product_has_function(struct android_usb_product *p,
 		 * android_usb_product.functions[i].
 		 */
 		if (!strncmp(name, functions[i], strlen(functions[i])))
-#else /* below is original */
-		if (!strcmp(name, *functions++))
-#endif
 			return 1;
 	}
 	return 0;
@@ -480,17 +435,17 @@ static struct usb_composite_driver android_usb_driver = {
 void android_register_function(struct android_usb_function *f)
 {
 	struct android_dev *dev = _android_dev;
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET_FIX
-	/* LGE_CHANGE
-	 * Apply bug fix from google git(refer to Kconfig).
-	 * 2011-01-12, hyunhui.park@lge.com
-	 */
 	int lge_pid;
 
+	printk(KERN_INFO "android_register_function %s\n", f->name);
 	list_add_tail(&f->list, &_functions);
 	if (dev && should_bind_functions(dev)) {
-		lgeusb_debug("bind_functions() is called\n");
 		bind_functions(dev);
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET_FIX
+	/* LGE_CHANGE
+	 * 2011-01-12, hyunhui.park@lge.com
+	 */
+		lgeusb_debug("bind_functions() is called\n");
 		android_set_default_product(dev->product_id);
 
 		/* Without USB S/W reset */
@@ -503,19 +458,8 @@ void android_register_function(struct android_usb_function *f)
 				"product_id -- %x, serial no. -- %s\n", lge_pid,
 				((serial_number[0] != '\0') ? serial_number : "NULL"));
 
-	}
-#else /* below is original */
-	list_add_tail(&f->list, &_functions);
-	_registered_function_count++;
-
-	/* bind our functions if they have all registered
-	 * and the main driver has bound.
-	 */
-	if (dev->config && _registered_function_count == dev->num_functions) {
-		bind_functions(dev);
-		android_set_default_product(dev->product_id);
-	}
 #endif
+	}
 }
 
 /**
