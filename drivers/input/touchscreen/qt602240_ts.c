@@ -1012,7 +1012,7 @@ static void qt602240_input_report(struct qt602240_data *data, int single_id)
 		input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, finger[id].area);
 		input_report_abs(input_dev, ABS_MT_WIDTH_MAJOR, QT602240_MAX_WIDTH);
 		input_report_abs(input_dev, ABS_MT_TRACKING_ID, id);
-
+		input_report_key(input_dev, BTN_TOUCH, finger[id].area ? 1 : 0);
 		input_mt_sync(input_dev);
 	}
 #ifndef CONFIG_MACH_MSM8X55_VICTOR
@@ -1022,6 +1022,7 @@ static void qt602240_input_report(struct qt602240_data *data, int single_id)
 		input_report_abs(input_dev, ABS_X, finger[single_id].x);
 		input_report_abs(input_dev, ABS_Y, finger[single_id].y);
 	}
+	input_report_key(input_dev, BTN_TOUCH, finger[single_id].area ? 1 : 0);
 #endif
 	input_sync(input_dev);
 }
@@ -1890,7 +1891,7 @@ static int __devinit qt602240_probe(struct i2c_client *client,
 	qt_time_point = 0;
 #endif
 
-	input_dev->name = "AT42QT602240/ATMXT224 Touchscreen";
+	input_dev->name = "qt602240_ts";
 	input_dev->id.bustype = BUS_I2C;
 	input_dev->dev.parent = &client->dev;
 	input_dev->open = qt602240_input_open;
