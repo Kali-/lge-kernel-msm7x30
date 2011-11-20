@@ -275,9 +275,9 @@ gp2ap_device_initialise(void)
 	if(gp2ap_pdev->op_mode == PROX_OPMODE_A)
 		hys = 0xC2;
 	else if(gp2ap_pdev->op_mode == PROX_OPMODE_B1)
-		hys = 0x20;
+		hys = 0x40;//0x20;
 	else	/* PROX_OPMODE_B2 */
-		hys = 0x00;
+		hys = 0x20;//0x00;
 
 	ret = prox_i2c_write(GP2AP_REG_HYS, hys, GP2AP_NO_INTCLEAR);
 	if (ret < 0)
@@ -889,6 +889,17 @@ gp2ap_suspend(struct i2c_client *i2c_dev, pm_message_t state)
 	return 0;
 }
 
+static void
+gp2ap_report_init_staus(struct proximity_gp2ap_device *pdev)
+{
+	int vo_data;
+
+	//msleep(100);
+	msleep(10);
+	vo_data = prox_i2c_read(GP2AP_REG_PROX, GP2AP_NO_INTCLEAR);
+	vo_data = (vo_data >> 8) & 0x1;
+	gp2ap_report_event(vo_data);
+}
 static int
 gp2ap_resume(struct i2c_client *i2c_dev)
 {
@@ -933,6 +944,8 @@ gp2ap_resume(struct i2c_client *i2c_dev)
 	}
 
 	/* garbage data for first call */
+	//msleep(200);
+	msleep(20);
         gp2ap_report_event(PROX_SENSOR_DETECT_N);
 	pdev->last_vout = -1;
 
@@ -941,6 +954,7 @@ gp2ap_resume(struct i2c_client *i2c_dev)
 	/* safity code for H/W timming */
 	if (pdev->methods)
 		prox_i2c_write(GP2AP_REG_CON, 0x00, GP2AP_INTCLEAR);
+	gp2ap_report_init_staus(pdev);
 
 	pdev->sw_mode = PROX_STAT_OPERATING;
 

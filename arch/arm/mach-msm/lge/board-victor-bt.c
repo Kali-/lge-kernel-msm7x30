@@ -97,10 +97,10 @@ static int victor_bluetooth_power(int on)
 			}
 		}
 		gpio_set_value(BT_RESET_N, 0);
-		msleep(100);
+		mdelay(100);
 		printk(KERN_DEBUG "b-b-b.c Set BT gpio BT_RESET_N value 1\n");
 		gpio_set_value(BT_RESET_N, 1);
-		msleep(200);
+		mdelay(200);
 
 	} else {
 		for (pin = 0; pin < ARRAY_SIZE(bt_config_power_off); pin++) {
