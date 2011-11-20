@@ -790,7 +790,7 @@ static int tcm9000md_sensor_probe(const struct msm_camera_sensor_info *info,
 	s->s_release = tcm9000md_sensor_release;
 	s->s_config  = tcm9000md_sensor_config;
     s->s_camera_type = FRONT_CAMERA_2D;
-	s->s_mount_angle = 180;
+	s->s_mount_angle = 0;
 	
     CAM_MSG("tcm9000md.c : tcm9000md_sensor_probe - complete : %d \n", rc);
     return 0;

@@ -108,6 +108,10 @@ extern struct snddev_icodec_data headset_mono_voice_rx_data;
 extern struct snddev_icodec_data speaker_stereo_voice_rx_data;
 extern struct snddev_ecodec_data bt_sco_voice_rx_data;
 
+#ifdef CONFIG_LGE_MODEL_E739
+bool bTTY_Headset = false;
+#endif
+
 enum {
   QTR_EARPIECE = 0,
   QTR_HEADSET_VOICE,
@@ -121,6 +125,8 @@ enum {
   QTR_SPEAKER_MIC,
   QTR_TTY_MIC,
   QTR_REC_MIC,
+  QTR_CAM_MIC,
+  QTR_VOICE_MIC,
   QTR_CAL_MAX
 };
 
@@ -131,7 +137,7 @@ enum {
   VOICE_BT
 };
 
-  int QTR_index_data[12][4] = {
+  int QTR_index_data[14][4] = {
     {17,-1,-1,-1},
     {6,7,26,27},
     {6,7,27,28},
@@ -143,11 +149,13 @@ enum {
     {23,24,15,-1},
     {23,24,9,-1},
     {23,24,15,-1},
+    {23,24,9,-1},
+    {23,24,9,-1},
     {23,24,9,-1}};
 
 u8 QTR_cal_data[QTR_CAL_MAX][4] = {
-    {0x6, 0xFF,0xFF,0xFF},
-    {0x06,0x06,0x10,0x10},
+    {0x2, 0xFF,0xFF,0xFF},
+    {0x08,0x08,0x10,0x10},
     {0x10,0x10,0x10,0x10},
     {0x07,0x07,0x10,0x10},
     {0x0,0x0,0x10,0x10},
@@ -157,7 +165,9 @@ u8 QTR_cal_data[QTR_CAL_MAX][4] = {
     {0x02,0x02,0xC8,0xFF},
     {0x05,0x05,0xC1,0xFF},
     {0x0,0x0,0x88,0xFF},
-    {0x0D,0x0D,0xD0,0xFF}};
+    {0x1B,0x1B,0xC1,0xFF},
+    {0x1B,0x1B,0xC1,0xFF},
+    {0x05,0x05,0xD0,0xFF}};
     
   s16 voice_level_data[4][2] = {
     {400,-2000},
@@ -403,7 +413,7 @@ void set_QTRcal_data(void)
     return;
   }
 
-  read_size = fp_QTRcal->f_op->read(fp_QTRcal, file_data_array, 1000, &fp_QTRcal->f_pos);
+  read_size = fp_QTRcal->f_op->read(fp_QTRcal, file_data_array, 1500, &fp_QTRcal->f_pos);
   
   token = strtok(file_data_array, separator);
   if ((u8)strtol(token, NULL, 16) == 0)
@@ -536,11 +546,34 @@ static long audio_misc_ioctl(struct file *file, unsigned int cmd, unsigned long 
 
         case SET_AUDIO_CAL:
 #ifdef CONFIG_LGE_MODEL_E739
-		  set_QTRcal_data();
-		  if (bReadCalData) {
-				set_ampcal_data();
-				set_voicecal_data();
-          }
+		  if (copy_from_user(&lb_path,(void *)arg,sizeof(int)))
+			  return 0;
+		  MM_INFO("ioctl arg = %d\n", lb_path);
+		  if (lb_path <10)
+		  {
+			lmsg.args.mode = cpu_to_be32( lb_path );
+			  lmsg.args.cb_func = CALLBACK_NULL;
+			  lmsg.args.client_data = 0;
+
+
+			  if (lb_path == 0)
+				  bTTY_Headset = false;
+			  else
+				  bTTY_Headset = true;
+
+			  if (rc < 0)
+				  MM_ERR("failed to do loopback\n");
+			  else
+				  MM_INFO("TTY SET function called successfully\n");
+		  }
+		  else
+		  {
+			  set_QTRcal_data();
+			  if (bReadCalData) {
+					set_ampcal_data();
+					set_voicecal_data();
+	          }
+		  }
 #endif	  
           break;
     

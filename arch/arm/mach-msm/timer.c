@@ -816,7 +816,7 @@ int64_t msm_timer_enter_idle(void)
 	count = msm_read_timer_count(clock, LOCAL_TIMER);
 	if (clock_state->stopped++ == 0)
 		clock_state->stopped_tick = count + clock_state->sleep_offset;
-	/* Add Test code for timer panic from QCT, munyoung.hwang@lge.com */
+
 #ifdef CONFIG_MACH_LGE
 	alarm = readl(clock->regbase + TIMER_MATCH_VAL);
 	if(clock_state->alarm < alarm)
@@ -827,8 +827,8 @@ int64_t msm_timer_enter_idle(void)
 	delta = alarm - count;
 	if (delta <= -(int32_t)((clock->freq << clock->shift) >> 10)) {
 		/* timer should have triggered 1ms ago */
-		printk(KERN_ERR "msm_timer_enter_idle: timer late %d (%d/%d/%d), "
-			   "reprogram it\n", delta, alarm, count, readl(clock->regbase + TIMER_MATCH_VAL));
+		printk(KERN_ERR "msm_timer_enter_idle: timer late %d, "
+			"reprogram it\n", delta);
 		msm_timer_reactivate_alarm(clock);
 	}
 	if (delta <= 0)

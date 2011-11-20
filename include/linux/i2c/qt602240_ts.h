@@ -23,6 +23,14 @@
 #define QT602240_ROTATED_180		0x6
 #define QT602240_DIAGONAL_COUNTER	0x7
 
+#ifndef CONFIG_MACH_MSM8X55_VICTOR
+	#define QT602240_USE_FIRMWARE_CLASS
+#endif
+
+#ifndef QT602240_USE_FIRMWARE_CLASS
+#include "../../../drivers/input/touchscreen/qt602240_firmware_2_0.h"
+#endif
+
 /* The platform data for the AT42QT602240/ATMXT224 touchscreen driver */
 #ifndef CONFIG_MACH_MSM8X55_VICTOR
 struct qt602240_platform_data {

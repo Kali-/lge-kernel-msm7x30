@@ -51,6 +51,10 @@
 #include <mach/msm_migrate_pages.h>
 #endif
 
+#ifdef CONFIG_MACH_LGE
+#include <asm/cacheflush.h>  //0905 : LGE_UPDATE
+#endif
+
 #include "smd_private.h"
 #include "smd_rpcrouter.h"
 #include "acpuclock.h"
@@ -1819,6 +1823,10 @@ static void msm_pm_restart(char str, const char *cmd)
 	msm_rpcrouter_close();
 
 	spin_lock(&power_lock);
+#endif
+
+#ifdef CONFIG_MACH_LGE
+	flush_cache_all(); //0905 LGE_UPDAT E
 #endif
 
 #ifdef CONFIG_LGE_HANDLE_PANIC
