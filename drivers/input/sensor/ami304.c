@@ -536,6 +536,32 @@ static ssize_t show_chipinfo_value(struct device *dev,
 	return sprintf(buf, "%s\n", strbuf);
 }
 
+static ssize_t show_enable_value(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	char strbuf[AMI304_BUFSIZE];
+	sprintf(strbuf, "%d", atomic_read(&ami304_report_enabled));
+	return sprintf(buf, "%s\n", strbuf);
+}
+
+static ssize_t store_enable_value(struct device *dev, 
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int mode=0;
+	sscanf(buf, "%d", &mode);
+	if (mode) {
+			ami304_resume(dev);
+			atomic_set(&ami304_report_enabled, 1);
+			printk(KERN_INFO "Compass_Power On\n");
+	}
+	else {
+			ami304_suspend(dev);
+			atomic_set(&ami304_report_enabled, 0);
+			printk(KERN_INFO "Compass_Power Off\n");
+	}
+	return 0;
+}
+
 static ssize_t show_sensordata_value(struct device *dev, 
 		struct device_attribute *attr, char *buf)
 {
@@ -649,6 +675,7 @@ static ssize_t show_wia_value(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%s\n", strbuf);			
 }
 
+#if defined(AMI304_TEST)
 /* Test mode attribute */
 static ssize_t show_pitch_value(struct device *dev, 
 		struct device_attribute *attr, char *buf)
@@ -702,32 +729,39 @@ static ssize_t store_motion_cal_onoff(struct device *dev,
 
 	return count;
 }
+#endif
+
 static DEVICE_ATTR(chipinfo, S_IRUGO, show_chipinfo_value, NULL);
 static DEVICE_ATTR(sensordata, S_IRUGO, show_sensordata_value, NULL);
+static DEVICE_ATTR(enable,S_IRUGO|S_IWUSR, show_enable_value, store_enable_value);
 static DEVICE_ATTR(posturedata, S_IRUGO, show_posturedata_value, NULL);
 static DEVICE_ATTR(calidata, S_IRUGO, show_calidata_value, NULL);
 static DEVICE_ATTR(gyrodata, S_IRUGO, show_gyrodata_value, NULL);
 static DEVICE_ATTR(midcontrol, S_IRUGO | S_IWUSR, show_midcontrol_value, store_midcontrol_value );
 static DEVICE_ATTR(mode, S_IRUGO | S_IWUSR, show_mode_value, store_mode_value );
 static DEVICE_ATTR(wia, S_IRUGO, show_wia_value, NULL);
+#if defined(AMI304_TEST)
 static DEVICE_ATTR(pitch, S_IRUGO | S_IWUSR, show_pitch_value, NULL);
 static DEVICE_ATTR(roll, S_IRUGO | S_IWUSR, show_roll_value, NULL);
 //Sensor Calibration
 static DEVICE_ATTR(cal_onoff, S_IRUGO|S_IWUSR, show_motion_cal_onoff, store_motion_cal_onoff);
-
+#endif
 static struct attribute *ami304_attributes[] = {
 	&dev_attr_chipinfo.attr,
-	&dev_attr_sensordata.attr,
+	&dev_attr_sensordata.attr,	/*AT command attributr */
 	&dev_attr_posturedata.attr,
 	&dev_attr_calidata.attr,
 	&dev_attr_gyrodata.attr,
 	&dev_attr_midcontrol.attr,
 	&dev_attr_mode.attr,
 	&dev_attr_wia.attr,
+	&dev_attr_enable.attr,	/*AT command attributr */
+#if defined(AMI304_TEST)
 	/* Test mode attribute */
 	&dev_attr_pitch.attr,
 	&dev_attr_roll.attr,
 	&dev_attr_cal_onoff.attr,
+#endif
 	NULL,
 };
 

@@ -102,7 +102,7 @@
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0xAC)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xF0)}, \
 	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_READY}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x0D, 0xFF, 0xD0)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x0D, 0xFF, 0xC1)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x11, 0xFF, 0xBC)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x12, 0xFF, 0xBC)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x14, 0xFF, 0x65)}, \
@@ -140,7 +140,7 @@
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0xAC)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xF0)}, \
 	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_READY}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x0D, 0xFF, 0xD0)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x0D, 0xFF, 0xC1)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x11, 0xFF, 0xBC)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x12, 0xFF, 0xBC)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x14, 0xFF, 0x65)}, \
@@ -154,8 +154,8 @@
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x83, 0x0C, 0x0C)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8b, 0xff, 0xE6)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8c, 0x03, 0x02)}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x86, 0xFF, 0x0D)}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0x0D)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x86, 0xFF, 0x1B)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0x1B)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xC0)}, \
 	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_ANALOG_READY}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xF0)}, \
@@ -169,6 +169,43 @@
 	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_OFF} }
   
 #define SPEAKER_TX_48000_OSR_256_CAM_REC \
+	{{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_FLASH_IMAGE},  \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x80, 0x05, 0x05)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x80, 0x05, 0x00)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x83, 0x0C, 0x00)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0x30)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x86, 0xFF, 0xAC)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0xAC)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xF0)}, \
+	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_READY}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x0D, 0xFF, 0xC1)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x11, 0xFF, 0xBC)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x12, 0xFF, 0xBC)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x14, 0xFF, 0x65)}, \
+	{ADIE_CODEC_ACTION_DELAY_WAIT, 0xbb8}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x82, 0xFF, 0x1E)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0xA3, 0x01, 0x01)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x93, 0xFF, 0x00)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x94, 0xFF, 0x1B)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x99, 0x0F, 0x00)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x9F, 0x03, 0x03)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x83, 0x0C, 0x0C)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8b, 0xff, 0xE6)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8c, 0x03, 0x02)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x86, 0xFF, 0x1B)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0x1B)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xC0)}, \
+	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_ANALOG_READY}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xF0)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x83, 0x0C, 0x00)}, \
+	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_ANALOG_OFF}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x0D, 0xFF, 0x00)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x14, 0xFF, 0x64)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x11, 0xFF, 0x00)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x12, 0xFF, 0x00)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0xAB, 0x09, 0x09)}, \
+	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_OFF} }
+#define SPEAKER_TX_48000_OSR_256_VOICE_REC \
 	{{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_FLASH_IMAGE},  \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x80, 0x05, 0x05)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x80, 0x05, 0x00)}, \
@@ -192,8 +229,8 @@
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x83, 0x0C, 0x0C)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8b, 0xff, 0xE6)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8c, 0x03, 0x02)}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x86, 0xFF, 0x0D)}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0x0D)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x86, 0xFF, 0x05)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x87, 0xFF, 0x05)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xC0)}, \
 	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_DIGITAL_ANALOG_READY}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8A, 0xF0, 0xF0)}, \
@@ -371,7 +408,7 @@ static struct snddev_icodec_data tty_rx_data = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE | SNDDEV_CAP_TTY),
 	.name = "tty_headset_mono_rx",
 	.copp_id = 0,
-	.acdb_id = ACDB_ID_HEADSET_SPKR_MONO,
+		.acdb_id = ACDB_ID_TTY_HEADSET_SPKR,
 	.profile = &tty_rx_profile,
 	.channel_mode = CHANNEL_MODE_MONO,
 	.default_sample_rate = 48000,
@@ -775,7 +812,7 @@ struct adie_codec_action_unit tty_tx_actions[] =
 
 static struct adie_codec_hwsetting_entry tty_tx_settings[] = {
 	{
-		.freq_plan = 8000,
+		.freq_plan = 48000,
 		.osr = 256,
 		.actions = tty_tx_actions,
 		.action_sz = ARRAY_SIZE(tty_tx_actions),
@@ -792,10 +829,10 @@ static struct snddev_icodec_data tty_tx_data = {
 	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE | SNDDEV_CAP_TTY),
 	.name = "tty_tx",
 	.copp_id = 0,
-	.acdb_id = ACDB_ID_HEADSET_MIC,
+	.acdb_id = ACDB_ID_TTY_HEADSET_MIC,
 	.profile = &tty_tx_profile,
 	.channel_mode = CHANNEL_MODE_MONO,
-	.default_sample_rate = 8000,
+	.default_sample_rate = 48000,
 	.pmctl_id = NULL,
 	.pmctl_id_sz = 0,
 	.pamp_on = NULL,
@@ -864,8 +901,8 @@ static struct snddev_icodec_data mic1_rec_tx_data = {
 	.acdb_id = ACDB_ID_LGE_MIC1_REC_TX,
 	.profile = &mic1_rec_tx_profile,
 	.channel_mode = CHANNEL_MODE_MONO,
-	.pmctl_id = handset_mic1_pmctl_id,
-	.pmctl_id_sz = ARRAY_SIZE(handset_mic1_pmctl_id),
+	.pmctl_id = handset_mic_aux_pmctl_id,
+	.pmctl_id_sz = ARRAY_SIZE(handset_mic_aux_pmctl_id),
 	.default_sample_rate = 48000,
 };
 
@@ -902,8 +939,8 @@ static struct snddev_icodec_data cam_rec_tx_data = {
 	.acdb_id = ACDB_ID_LGE_MIC1_REC_TX,
 	.profile = &cam_rec_tx_profile,
 	.channel_mode = CHANNEL_MODE_MONO,
-	.pmctl_id = handset_mic1_pmctl_id,
-	.pmctl_id_sz = ARRAY_SIZE(handset_mic1_pmctl_id),
+	.pmctl_id = handset_mic_aux_pmctl_id,
+	.pmctl_id_sz = ARRAY_SIZE(handset_mic_aux_pmctl_id),
 	.default_sample_rate = 48000,
 };
 
@@ -913,6 +950,43 @@ static struct platform_device lge_device_cam_rec_tx = {
 	.dev = { .platform_data = &cam_rec_tx_data },
 };
 
+//===========================================================================
+
+static struct adie_codec_action_unit voice_rec_tx_actions[] =
+	SPEAKER_TX_48000_OSR_256_VOICE_REC;
+
+static struct adie_codec_hwsetting_entry voice_rec_tx_settings[] = {
+	{
+		.freq_plan = 48000,
+		.osr = 256,
+		.actions = voice_rec_tx_actions,
+		.action_sz = ARRAY_SIZE(voice_rec_tx_actions),
+	}
+};
+
+static struct adie_codec_dev_profile voice_rec_tx_profile = {
+	.path_type = ADIE_CODEC_TX,
+	.settings = voice_rec_tx_settings,
+	.setting_sz = ARRAY_SIZE(voice_rec_tx_settings),
+};
+
+static struct snddev_icodec_data voice_rec_tx_data = {
+	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
+	.name = "voice_rec_tx",
+	.copp_id = 0,
+	.acdb_id = ACDB_ID_LGE_MIC1_REC_TX,
+	.profile = &voice_rec_tx_profile,
+	.channel_mode = CHANNEL_MODE_MONO,
+	.pmctl_id = handset_mic1_pmctl_id,
+	.pmctl_id_sz = ARRAY_SIZE(handset_mic1_pmctl_id),
+	.default_sample_rate = 48000,
+};
+
+static struct platform_device lge_device_voice_rec_tx = {
+	.name = "snddev_icodec",
+	.id = DEVICE_ID_INTERNAL_VOICE_REC,
+	.dev = { .platform_data = &voice_rec_tx_data },
+};
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -938,6 +1012,7 @@ static struct platform_device *lge_snd_devices[] __initdata = {
   &lge_device_bt_sco_voice_tx,
   &lge_device_mic1_rec_tx,
   &lge_device_cam_rec_tx,
+  &lge_device_voice_rec_tx,
 }; 
  
 struct adie_codec_action_unit *codec_cal[] = {
@@ -952,7 +1027,9 @@ struct adie_codec_action_unit *codec_cal[] = {
   headset_voice_tx_actions,
   speaker_voice_tx_actions,
   tty_tx_actions,
-  mic1_rec_tx_actions
+  mic1_rec_tx_actions,
+  cam_rec_tx_actions,
+  voice_rec_tx_actions 
 };
 
 void __init msm_snddev_init(void)

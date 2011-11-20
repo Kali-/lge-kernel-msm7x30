@@ -37,6 +37,7 @@
 #include <linux/timer.h>
 #include <linux/jiffies.h>
 
+#define BMA250_ATCMD
 //#define BMA250_DEBUG
 #define	BMA250_ENABLE_IRQ
 // 2011-05-31 by baborobo@lge.com
@@ -3402,8 +3403,6 @@ int bma250_set_accelerometer(unsigned char enable)
 	int err = 0;
 	struct bma250_data *data = i2c_get_clientdata(bma250_client);
 
-
-
 	if(enable) {
 		if(data->sensor_enable == 0) {
 			err = bma250_set_mode(bma250_MODE_NORMAL);
@@ -5881,14 +5880,75 @@ bma250_status_tap_slop_show(struct device *dev, struct device_attribute *attr, c
 	return snprintf(buf, PAGE_SIZE, "status_interrupt(0x%x) = 0x%x\n", bma250_STATUS_ORIENT_HIGH_REG, val);
 }
 
+#endif /* BMA250_DEBUG */
+
+#ifdef BMA250_ATCMD
+static ssize_t 
+show_enable_value(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	char strbuf[256];
+	struct i2c_client *client = i2c_verify_client(dev);
+	struct bma250_data *bma = i2c_get_clientdata(client);
+	
+	sprintf(strbuf, "%d", bma->sensor_enable);
+	return sprintf(buf, "%s\n", strbuf);
+}
+
+static ssize_t 
+store_enable_value(struct device *dev, 
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int mode=0;
+	struct i2c_client *client = i2c_verify_client(dev);
+	struct bma250_data *bma = i2c_get_clientdata(client);
+
+	printk(KERN_INFO "store_enable_value -> mode : %d\n", mode);
+	sscanf(buf, "%d", &mode);
+	if (mode) {
+			bma->sensor_enable = 0;
+			bma250_set_accelerometer(1);
+			bma250_pdata->power(1);
+			mdelay(5);
+			printk(KERN_INFO "Power On Enable\n");
+	}
+	else {
+			bma->sensor_enable = 1;
+			bma250_set_accelerometer(0);
+			bma250_pdata->power(0);
+			mdelay(5);
+			printk(KERN_INFO "Power Off Disable\n");
+	}
+	return 0;
+}
+
+static ssize_t 
+show_sensordata_value(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+
+	char strbuf[5];
+	bma250acc_t bma_acc;
+	bma250_read_accel_xyz(&bma_acc);
+	sprintf(strbuf, "%d %d %d", bma_acc.x, bma_acc.y, bma_acc.z);
+	return sprintf(buf, "%s\n",strbuf);
+}
+#endif
+
 //ex) # echo 0x11 0x12 > sys/devices/platform/i2c-gpio.11/i2c-11/11-0018/debug
 static struct device_attribute bma250_device_attrs[] = {
+#ifdef BMA250_DEBUG
 	__ATTR(debug, S_IRUGO | S_IWUSR, bma250_debug_show, bma250_debug_store),
 	__ATTR(int_stutus, S_IRUGO, bma250_status_interrupt_show, NULL),
 	__ATTR(flat_orient, S_IRUGO, bma250_status_flat_orient_show, NULL),
-	__ATTR(tap_slop, S_IRUGO, bma250_status_tap_slop_show, NULL)
+	__ATTR(tap_slop, S_IRUGO, bma250_status_tap_slop_show, NULL),
+#endif 
+#ifdef BMA250_ATCMD
+	__ATTR(enable, S_IRUGO | S_IWUSR, show_enable_value, store_enable_value),
+	__ATTR(sensordata, S_IRUGO, show_sensordata_value, NULL)
+#endif
 };
-#endif /* BMA250_DEBUG */
+
 
 static int bma250_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
@@ -6003,7 +6063,7 @@ static int bma250_probe(struct i2c_client *client,
     register_early_suspend(&data->early_suspend);
 #endif
 
-#ifdef BMA250_DEBUG
+#if defined(BMA250_DEBUG) || defined(BMA250_ATCMD)
 	/* create sysfs attribute files */
 	for (tempvalue = 0; tempvalue < ARRAY_SIZE(bma250_device_attrs); tempvalue++) {
 		err = device_create_file(&client->dev, &bma250_device_attrs[tempvalue]);

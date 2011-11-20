@@ -235,7 +235,7 @@ struct wm9093_param_type wm9093_param_table[] = {
 		WM90903_AMP_SPEAKER_AMP_GAIN_0DB,
 		WM9093_AMP_SPEAKER_OUT_GAIN_BOOSTT_3_98,
 		60,
-		47,
+		50,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 /* ICODEC_SPEAKER_RX */
 	{	0x01,

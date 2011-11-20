@@ -1380,7 +1380,43 @@ static int msmsdcc_get_status(struct mmc_host *mmc)
 
 	if (host->plat->status) {
 
+// LGE_UPDATE_S /* To distinguish between Real-Interrupt and Fake-Interrupt */
+#if 0
 		status = host->plat->status(mmc_dev(mmc));
+#else
+		#define MAX_RECHECK 4
+		#define SD_DETECT_GPIO_RECHECK_DELAYTIME 25 // 25ms
+		int gpio_recheck_count=0;
+		int gpio_first_value=0;
+		int gpio_hit_count=0;
+
+		gpio_first_value=host->plat->status(mmc_dev(mmc));
+		for(gpio_recheck_count=0 ;gpio_recheck_count < MAX_RECHECK ; gpio_recheck_count++ )
+		{
+			msleep(SD_DETECT_GPIO_RECHECK_DELAYTIME); /* Time-Delay¸¦ ÁØ´Ù.*/
+			status = host->plat->status(mmc_dev(mmc)); /* Recheck */
+			if(gpio_first_value != status) /* Fake-Interrupt Case */
+			{
+				printk(KERN_INFO "FAKE-INTERRUPT! gpio_first_value:%d,status:%d\n", 
+					gpio_first_value,status);
+				gpio_hit_count=0;
+				gpio_first_value = status;
+				gpio_recheck_count=0;
+			}
+			else
+			{
+				gpio_hit_count++;
+				if(gpio_hit_count >= MAX_RECHECK)
+				{
+					printk(KERN_INFO "INTERRUPT-HIT!REAL! gpio_hit_count:%d\n", 
+						gpio_hit_count);
+					gpio_hit_count=0;
+					break;
+				}
+			}
+		}
+#endif
+// LGE_UPDATE_E
 		host->eject = !status;
 
 		if (status ^ host->oldstat) {

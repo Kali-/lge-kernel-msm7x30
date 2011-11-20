@@ -52,6 +52,11 @@
 #include <linux/slab.h>
 #include <mach/board_lge.h>
 
+#ifdef CONFIG_LGE_MODEL_E739
+#include <linux/timer.h>
+#endif
+
+
 #if defined (CONFIG_LGE_DOMESTIC) || defined(CONFIG_LGE_MODEL_E739)
 #define	OLD_REV		LGE_REV_B
 #else
@@ -73,6 +78,15 @@
 #define HSD_ERR(fmt, args...) printk(KERN_ERR "HSD[%-18s:%5d]" fmt, __func__, __LINE__, ## args)
 #else
 #define HSD_ERR(fmt, args...) do {} while (0)
+#endif
+
+
+#ifdef CONFIG_LGE_MODEL_E739
+static void remove_headset(void);
+struct timer_list hs_remove_timer;
+
+extern bool bTTY_Headset;
+static bool bTTY_Removed = false;
 #endif
 
 static void hs_detect_work_func(struct work_struct *work);
@@ -149,6 +163,11 @@ static void button_pressed(void)
 {
 	HSD_DBG("button_pressed \n");
 
+    if (gpio_get_value(hi->hs_detect_gpio) == 1)
+    {
+		HSD_DBG("no headset button error!!!!!!!!! \n");
+        return;
+    }
 	/* set button status */
 	atomic_set(&hi->btn_state, BUTTON_PRESSED);
 
@@ -165,6 +184,12 @@ static void button_released(void)
 {
 	HSD_DBG("button_released \n");
 
+    if (gpio_get_value(hi->hs_detect_gpio) == 1)
+    {
+		HSD_DBG("no headset button error!!!!!!!!! \n");
+        return;
+    }
+
 	/* set button status */
 	atomic_set(&hi->btn_state, BUTTON_RELEASED);
 
@@ -176,11 +201,33 @@ static void button_released(void)
 	wake_lock_timeout(&hi->headset_wake_lock, 1.5*HZ);
 }
 
+#ifdef CONFIG_LGE_MODEL_E739
+static void remove_tty_headset(unsigned long arg)
+{
+
+	del_timer(&hs_remove_timer);
+	remove_headset();
+	bTTY_Removed = false;
+}
+#endif
+
 static void remove_headset(void)
 {
 	unsigned long irq_flags;
+	
+#ifdef CONFIG_LGE_MODEL_E739
+	HSD_DBG("remove_headset bTTY_Headset :%d bTTY_Removed :%d\n", bTTY_Headset, bTTY_Removed);
 
-	HSD_DBG("remove_headset \n");
+	if (bTTY_Headset && !bTTY_Removed)
+	{
+		bTTY_Removed = true;
+		init_timer(&hs_remove_timer);
+		hs_remove_timer.function = remove_tty_headset;
+		hs_remove_timer.expires = jiffies + 3*HZ;
+		add_timer(&hs_remove_timer);
+		return;
+	}
+#endif
 
 	if (switch_get_state(&hi->sdev) == LGE_HEADSET)	{
 		/* disable irq for hook key*/
@@ -209,6 +256,11 @@ static void insert_headset(bool has_hook)
 	unsigned long irq_flags;
 
 	HSD_DBG("insert_headset : %d\n", has_hook);
+#ifdef CONFIG_LGE_MODEL_E739
+	if (bTTY_Headset)
+		has_hook = true;
+#endif
+	
 
 	/* change switch status to heaset */
 	if (has_hook)	{
@@ -252,7 +304,7 @@ static void hs_detect_work_func(struct work_struct *work)
 
 	/* Rev old 	: HIGH - INSERT, LOW - OUT */
 	/* Rev new	: HIGH - OUT,		LOW - INSERT */
-	if (lge_bd_rev > OLD_REV)
+	if (lge_bd_rev >= OLD_REV)
 	{
 		if(gpio_get_value(hi->hs_detect_gpio))
 			state = 0;
@@ -289,9 +341,12 @@ static enum hrtimer_restart button_event_timer_func(struct hrtimer *data)
 	int value;
 	unsigned long irq_flags;
 
-	/* to ignore button irp when headset is removed and inserted in debounce delay*/
-	if (hi->on_headset_detect)
-		goto invalid_status;
+
+		/* to ignore button irp when headset is removed and inserted in debounce delay*/
+		if (hi->on_headset_detect)
+			goto invalid_status;
+	
+
 
 	/* skip if has no key */
 	if (switch_get_state(&hi->sdev) != LGE_HEADSET)
@@ -326,7 +381,7 @@ static irqreturn_t headset_detect_irq_handler(int irq, void *dev_id)
 
 	/* Rev old 	: HIGH - INSERT, LOW - OUT */
 	/* Rev new	: HIGH - OUT,		LOW - INSERT */
-	if (lge_bd_rev > OLD_REV)
+	if (lge_bd_rev >= OLD_REV)
 	{
 		if(gpio_get_value(hi->hs_detect_gpio))
 			state = 0;
@@ -335,6 +390,17 @@ static irqreturn_t headset_detect_irq_handler(int irq, void *dev_id)
 	}
 	else
 		state = gpio_get_value(hi->hs_detect_gpio);	
+
+#ifdef CONFIG_LGE_MODEL_E739
+	if (bTTY_Removed)
+		{
+
+		del_timer(&hs_remove_timer);
+		bTTY_Removed = false;
+
+		}
+#endif
+
 
 	/* there is change in headset status*/
 	if (((switch_get_state(&hi->sdev) ? 1 : 0) ^ state))	{
@@ -364,9 +430,10 @@ static irqreturn_t hook_switch_irq_handler(int irq, void *dev_id)
 	hi->old_btn_status = gpio_get_value(hi->hook_switch_gpio);
 
 	/* skip if button status is same */
-	hrtimer_start(&hi->btn_timer, 
-					(hi->old_btn_status == BUTTON_PRESSED)? hi->btndn_debounce_time : hi->btnup_debounce_time, 
-					HRTIMER_MODE_REL);
+//	hrtimer_start(&hi->btn_timer, hi->btn_debounce_time, HRTIMER_MODE_REL);
+		hrtimer_start(&hi->btn_timer, 
+						(hi->old_btn_status == BUTTON_PRESSED)? hi->btndn_debounce_time : hi->btnup_debounce_time, 
+						HRTIMER_MODE_REL);
 
 	return IRQ_HANDLED;
 }
@@ -394,9 +461,10 @@ static int __init lge_hsd_probe(struct platform_device *pdev)
 	hi->hook_switch_gpio = 145;
 	hi->hs_mode_gpio = 31;
 	hi->hsd_debounce_time = 300; /* 300 ms */
-	hi->btndn_debounce_time = ktime_set(0, 100000000); /* 100 ms */
-	hi->btnup_debounce_time = ktime_set(0, 30000000); /* 100 ms */
-	
+//	hi->btn_debounce_time = ktime_set(0, 30000000); /* 30 ms */
+		hi->btndn_debounce_time = ktime_set(0, 100000000); /* 100 ms */
+		hi->btnup_debounce_time = ktime_set(0, 30000000); /* 100 ms */
+
 	/* init headset wake lock */
 	wake_lock_init(&hi->headset_wake_lock, WAKE_LOCK_SUSPEND, "lge_headset");
 
