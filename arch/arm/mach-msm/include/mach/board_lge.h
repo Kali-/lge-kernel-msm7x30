@@ -195,16 +195,6 @@ struct bluesleep_platform_data {
 	int bluetooth_port_num;
 };
 
-#ifdef CONFIG_LGE_BROADCAST	
-struct broadcast_device_platform_data {
-	void (*dmb_gpio_on)(void);
-	void (*dmb_gpio_off)(void);
-	void (*dmb_gpio_init)(void);
-	int (*dmb_power_on)(void);
-	int (*dmb_power_off)(void);
-};
-#endif
-
 typedef void (gpio_i2c_init_func_t)(int bus_num);
 int __init init_gpio_i2c_pin(struct i2c_gpio_platform_data *i2c_adap_pdata,
 		struct gpio_i2c_pin gpio_i2c_pin,
@@ -244,10 +234,6 @@ void __init lge_add_btpower_devices(void);
 
 void __init lge_add_gpio_i2c_device(gpio_i2c_init_func_t *init_func);
 void __init lge_add_gpio_i2c_devices(void);
-
-#ifdef CONFIG_LGE_BROADCAST	
-void __init lge_add_broadcast_dmb_devices(void);
-#endif
 
 void __init lge_add_lcd_devices(void);
 void __init msm_qsd_spi_init(void);

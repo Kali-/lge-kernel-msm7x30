@@ -149,13 +149,8 @@ static int tsif_init_one(struct tsif_chrdev *the_dev, int index)
 	the_dev->cdev.owner = THIS_MODULE;
 	init_waitqueue_head(&the_dev->wq_read);
 	rc = cdev_add(&the_dev->cdev, tsif_dev0++, 1);
-#ifdef CONFIG_LGE_BROADCAST /* LGE_FW_TDMB */	
-	the_dev->dev = device_create(tsif_class, NULL, MKDEV(MAJOR(tsif_dev),0),
-				     the_dev, "tsif%d", index);
-#else
 	the_dev->dev = device_create(tsif_class, NULL, the_dev->cdev.dev,
 				     the_dev, "tsif%d", index);
-#endif
 	if (IS_ERR(the_dev->dev)) {
 		rc = PTR_ERR(the_dev->dev);
 		pr_err("device_create failed: %d\n", rc);

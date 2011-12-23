@@ -662,11 +662,6 @@ static void __init msm7x30_init(void)
 
 	/* add input devices */
 	lge_add_input_devices();
-//LGE_FW_TDMB [START]
-#ifdef CONFIG_LGE_BROADCAST	
-	lge_add_broadcast_dmb_devices();
-#endif
-//LGE_FW_TDMB [END]
 
 	/* gpio i2c devices should be registered at latest point */
 	lge_add_gpio_i2c_devices();

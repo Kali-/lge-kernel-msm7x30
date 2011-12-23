@@ -100,16 +100,8 @@
 #define TESTMODE_FILE_CRC_CHECK 78
 #define TESTMODE_DB_DUMP 79
 #define TESTMODE_DB_COPY 80
-//#define MAX_KEYS	80
-//#define MAX_KEYS	73
+#define MAX_KEYS	80
 // END [jongrok.jung@lge.com] 20110309 Testmode 8.5 }  
-
-// START LGE_BROADCAST andrew74.kim@lge.com 2011-03-18 : TDMB BLT Test {
-// Requested by Production Tech.
-#define TESTMODE_INPUT_KEY_TDMB_PLAY_ON  81
-#define TESTMODE_INPUT_KEY_TDMB_PLAY_OFF 82
-#define MAX_KEYS 82
-// END LGE_BROADCAST}
 
 /* exported function to deliver an event to the android event hub */
 void testmode_input_report_evt(int evtcode);

@@ -53,11 +53,6 @@
 extern int load_rle_image(char *filename);
 #endif
 
-#ifdef CONFIG_LGE_BROADCAST
-extern void mdp4_vg_csc_default_setup(void);
-extern void mdp4_vg_csc_dmb_setup(struct mdp_ccs *p);
-#endif
-
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_NUM	3
 #endif
@@ -2770,9 +2765,6 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 #ifndef CONFIG_FB_MSM_MDP40
 	struct mdp_ccs ccs_matrix;
 #else
-#ifdef CONFIG_LGE_BROADCAST
-	struct mdp_ccs ccs_matrix;
-#endif
 	struct mdp_csc csc_matrix;
 #endif
 	struct mdp_page_protection fb_page_protection;
@@ -2902,25 +2894,7 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		}
 		up(&msm_fb_ioctl_ppp_sem);
 #else
-#ifdef CONFIG_LGE_BROADCAST
-		ret = copy_from_user(&ccs_matrix, argp, sizeof(ccs_matrix));
-		if (ret) {
-			printk(KERN_ERR
-				"%s:MSMFB_SET_CCS_MATRIX ioctl failed \n",
-				__func__);
-			return ret;
-		}
-
-		down(&msm_fb_ioctl_ppp_sem);
-		if (ccs_matrix.direction == 0)
-			mdp4_vg_csc_default_setup();
-		else
-			mdp4_vg_csc_dmb_setup(&ccs_matrix);
-
-		up(&msm_fb_ioctl_ppp_sem);
-#else
 		ret = -EINVAL;
-#endif
 #endif
 
 		break;

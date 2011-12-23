@@ -117,5 +117,3 @@ obj-y				+= platform/
 obj-y				+= ieee802154/
 obj-$(CONFIG_LGE_MODEL_SU610)		+= nfc/
 #obj-y		+= nfc/
-# LGE_FW_TDMB
-obj-$(CONFIG_LGE_BROADCAST)	+= broadcast/

@@ -58,11 +58,6 @@ int lge_ats_handle_atcmd(struct msm_rpc_server *server,
 	uint32_t at_act;
 	uint32_t at_param;
 
-#ifdef CONFIG_LGE_BROADCAST	
-	/* mtv_blt_mode : 1 mtv_av_mode : 0*/
-	static int mtv_blt_mode = 0; 
-	struct broadcast_mtv_sig_info tdmbdata;
-#endif
 	at_cmd = be32_to_cpu(args->at_cmd);
 	at_act = be32_to_cpu(args->at_act);
 	at_param = be32_to_cpu(args->at_param);
@@ -176,62 +171,6 @@ int lge_ats_handle_atcmd(struct msm_rpc_server *server,
 		else
 			msleep(5000); // 5sec delay
 		break;
-//LG_BTUI_DUT : use brcm_patchram_plus [E]	
-#ifdef CONFIG_LGE_BROADCAST	
-	case ATCMD_MTV:	//150
-		if(at_act != ATCMD_ACTION)
-			result = HANDLE_FAIL;
-		printk(KERN_INFO "[MTV] %s: at_cmd => ATCMD_MTV\n", __func__);
-		if(at_param == 71)
-		{
-			printk(KERN_INFO "[MTV] AV Test On process\n");
-			update_atcmd_state("mtv", at_param);
-			mtv_blt_mode = 0;
-		}
-		else if(at_param == 1)
-		{	
-			if(mtv_blt_mode == 1)
-			{
-				printk(KERN_INFO "[MTV] BLT Off process\n");
-				mtv_blt_mode = 0;
-				broadcast_tdmb_blt_close();
-				broadcast_tdmb_blt_power_off();
-			}
-			else
-			{
-				printk(KERN_INFO "[MTV] AV Test Off process\n");
-				update_atcmd_state("mtv", at_param);
-			}
-		}
-		else
-		{
-			if((at_param > 71) &&(at_param <= 133))
-			{
-				printk(KERN_INFO "[MTV] BLT On\n");
-				broadcast_tdmb_blt_power_on();
-				broadcast_tdmb_blt_open();
-				
-				broadcast_tdmb_blt_tune_set_ch(at_param);
-
-				mtv_blt_mode = 1;
-				
-			}
-			else if((at_param == 2)||(at_param == 3)
-				|| (at_param == 4)||(at_param == 5))
-			{
-				broadcast_tdmb_blt_get_sig_info((void*)&tdmbdata);
-				ret_value1 = tdmbdata.msc_ber;
-				ret_value2 = tdmbdata.tp_err_cnt;
-				printk(KERN_INFO "[MTV] BLT get ber ber = %d, tp_err_cnt = %d\n", ret_value1, ret_value2);
-			}
-			else
-			{
-				printk(KERN_INFO "[MTV] BLT Error range\n");
-				//result = HANDLE_ERROR;
-			}
-		}
-		break;
-#endif
 	default :
 		result = HANDLE_ERROR;
 		break;

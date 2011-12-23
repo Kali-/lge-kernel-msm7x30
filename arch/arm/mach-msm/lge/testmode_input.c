@@ -112,11 +112,6 @@ static char testmode_input_key[MAX_KEYS] = {
 		TESTMODE_DB_DUMP,
 		TESTMODE_DB_COPY,
 // END [jongrok.jung@lge.com] 20110309 Testmode 8.5 } 		
-// START LGE_BROADCAST andrew74.kim@lge.com 2011-03-18 : TDMB BLT Test {
-// Requested by Production Tech.
-		TESTMODE_INPUT_KEY_TDMB_PLAY_ON,
-		TESTMODE_INPUT_KEY_TDMB_PLAY_OFF, 
-// END LGE_BROADCAST}
 };
 
 void testmode_input_report_evt(int evtcode)

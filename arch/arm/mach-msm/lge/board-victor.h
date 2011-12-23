@@ -159,15 +159,4 @@
 #define GPIO_AMP_I2C_SCL	88
 
 #define REG_WRITEL(value, reg)	writel(value, (MSM_WEB_BASE + reg))
-/* LGE_FW_TDMB [START] */
-#ifdef CONFIG_LGE_BROADCAST
-enum 
-{
-	DMB_I2C_SDA 	= 39,
-	DMB_I2C_SCL 	= 38,
-	DMB_RESET_N 	= 33,
-	DMB_PWR_EN 	= 41,
-};
-#endif
-/* LGE_FW_TDMB {END] */
 #endif

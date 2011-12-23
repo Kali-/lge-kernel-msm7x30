@@ -11,7 +11,6 @@ obj-$(CONFIG_MACH_MSM8X55_VICTOR) += board-victor-input.o
 obj-$(CONFIG_MACH_MSM8X55_VICTOR) += board-victor-panel.o
 obj-$(CONFIG_MACH_MSM8X55_VICTOR) += board-victor-bt.o
 obj-$(CONFIG_MACH_MSM8X55_VICTOR) += board-victor-camera.o
-obj-$(CONFIG_LGE_BROADCAST) += board-victor-dmb.o
 obj-$(CONFIG_MACH_LGE) += devices_lge.o
 
 obj-$(CONFIG_LGE_HEADSET_MAX14579) += lge_headset_MAX14579.o
