@@ -2282,6 +2282,7 @@ config FB_MSM_LCDC
 
 config FB_MSM_OVERLAY
 	depends on FB_MSM_MDP40 && ANDROID_PMEM
+	select FB_MSM_DTV
 	bool "MDP4 overlay support"
 	default n
 
