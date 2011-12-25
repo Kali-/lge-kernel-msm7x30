@@ -53,9 +53,6 @@
 
 #define MSMFB_MIXER_INFO       _IOWR(MSMFB_IOCTL_MAGIC, 148, \
 						struct msmfb_mixer_info_req)
-//ANDY_PORTING OSP [woongchang.kim@lge.com 110331]
-#define MSMFB_OSP_CAPTURE      _IOW(MSMFB_IOCTL_MAGIC, 149, unsigned int)
-//ANDY_END
 #define MSMFB_OVERLAY_PLAY_WAIT _IOWR(MSMFB_IOCTL_MAGIC, 149, \
 						struct msmfb_overlay_data)
 

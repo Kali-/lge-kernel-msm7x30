@@ -2433,56 +2433,6 @@ static int msmfb_blit(struct fb_info *info, void __user *p)
 	return 0;
 }
 
-//ANDY_PORTING OSP [woongchang.kim@lge.com 110331]
-static int msmfb_osp_capture(struct fb_info *info, void __user *p)
-{
-	int ret;
-	struct mdp_blit_req req;
-	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-
-	if (copy_from_user(&req, p, sizeof(struct mdp_blit_req)))
-		return -EFAULT;
-
-	/*
- 	* Ensure that any data CPU may have previously written to
- 	* internal state (but not yet committed to memory) is
- 	* guaranteed to be committed to memory now.
- 	*/
-	msm_fb_ensure_memory_coherency_before_dma(info, &req, 1);
-
-	down(&mfd->sem);
-
-	/*
- 	 * Do the blit DMA, if required -- returning early only if
-	 * there is a failure.
- 	 */
-	if (!(req.flags & MDP_NO_BLIT)) {
-		/* Do the actual blit. */
-		req.src.offset = info->var.yoffset * info->var.xres * 2;
-               
-		ret = mdp_blit(info, &req);
-
-		/*
-		 * Note that early returns don't guarantee
-		 * memory coherency.
-		 */
-		if (ret)
-			return ret;
-	}
-
-	up(&mfd->sem);
-
-	/*
-	 * Ensure that CPU cache and other internal CPU state is
-	 * updated to reflect any change in memory modified by MDP blit
-	 * DMA.
-	 */
-	msm_fb_ensure_memory_coherency_after_dma(info, &req, 1);
-
-	return 0;
-}
-//ANDY_END
-
 #ifdef CONFIG_FB_MSM_OVERLAY
 static int msmfb_overlay_get(struct fb_info *info, void __user *p)
 {
@@ -2857,14 +2807,6 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		up(&msm_fb_ioctl_ppp_sem);
 
 		break;
-
-//ANDY_PORTING OSP [woongchang.kim@lge.com 110331]
-	case MSMFB_OSP_CAPTURE:
-		down(&msm_fb_ioctl_ppp_sem);
-		ret = msmfb_osp_capture(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
-		break;
-//ANDY_END
 
 	/* Ioctl for setting ccs matrix from user space */
 	case MSMFB_SET_CCS_MATRIX:
