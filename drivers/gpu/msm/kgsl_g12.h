@@ -45,6 +45,7 @@ struct kgsl_g12_device {
 	int current_timestamp;
 	int timestamp;
 	struct kgsl_g12_ringbuffer ringbuffer;
+	spinlock_t cmdwin_lock;
 };
 
 irqreturn_t kgsl_g12_isr(int irq, void *data);
@@ -53,6 +54,10 @@ int kgsl_g12_idle(struct kgsl_device *device, unsigned int timeout);
 void kgsl_g12_regread(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int *value);
 void kgsl_g12_regwrite(struct kgsl_device *device, unsigned int offsetwords,
+			unsigned int value);
+void kgsl_g12_regread_isr(struct kgsl_device *device, unsigned int offsetwords,
+				unsigned int *value);
+void kgsl_g12_regwrite_isr(struct kgsl_device *device, unsigned int offsetwords,
 			unsigned int value);
 
 #endif /* _KGSL_G12_H */

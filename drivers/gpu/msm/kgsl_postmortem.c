@@ -33,6 +33,8 @@
 
 #define INVALID_RB_CMD 0xaaaaaaaa
 
+static int kgsl_pm_regs_enabled;
+
 struct pm_id_name {
 	uint32_t id;
 	char name[9];
@@ -72,6 +74,111 @@ static const struct pm_id_name pm3_types[] = {
 	{PM4_SET_PROTECTED_MODE,	"ST_PRT_M"},
 	{PM4_SET_SHADER_BASES,		"ST_SHD_B"},
 	{PM4_WAIT_FOR_IDLE,		"WAIT4IDL"},
+};
+
+/* Offset address pairs: start, end of range to dump (inclusive) */
+
+/* GPU < Z470 */
+
+static const int yamato_registers[] = {
+	0x0000, 0x0008, 0x0010, 0x002c, 0x00ec, 0x00f4,
+	0x0100, 0x0110, 0x0118, 0x011c,
+	0x0700, 0x0704, 0x070c, 0x0720, 0x0754, 0x0764,
+	0x0770, 0x0774, 0x07a8, 0x07a8, 0x07b8, 0x07cc,
+	0x07d8, 0x07dc, 0x07f0, 0x07fc, 0x0e44, 0x0e48,
+	0x0e6c, 0x0e78, 0x0ec8, 0x0ed4, 0x0edc, 0x0edc,
+	0x0fe0, 0x0fec, 0x1100, 0x1100,
+
+	0x110c, 0x1110, 0x112c, 0x112c, 0x1134, 0x113c,
+	0x1148, 0x1148, 0x1150, 0x116c, 0x11fc, 0x11fc,
+	0x15e0, 0x161c, 0x1724, 0x1724, 0x1740, 0x1740,
+	0x1804, 0x1810, 0x1818, 0x1824, 0x182c, 0x1838,
+	0x184c, 0x1850, 0x28a4, 0x28ac, 0x28bc, 0x28c4,
+	0x2900, 0x290c, 0x2914, 0x2914, 0x2938, 0x293c,
+	0x30b0, 0x30b0, 0x30c0, 0x30c0, 0x30e0, 0x30f0,
+	0x3100, 0x3100, 0x3110, 0x3110, 0x3200, 0x3218,
+	0x3220, 0x3250, 0x3264, 0x3268, 0x3290, 0x3294,
+	0x3400, 0x340c, 0x3418, 0x3418, 0x3420, 0x342c,
+	0x34d0, 0x34d4, 0x36b8, 0x3704, 0x3720, 0x3750,
+	0x3760, 0x3764, 0x3800, 0x3800, 0x3808, 0x3810,
+	0x385c, 0x3878, 0x3b00, 0x3b24, 0x3b2c, 0x3b30,
+	0x3b40, 0x3b40, 0x3b50, 0x3b5c, 0x3b80, 0x3b88,
+	0x3c04, 0x3c08, 0x3c30, 0x3c30, 0x3c38, 0x3c48,
+	0x3c98, 0x3ca8, 0x3cb0, 0x3cb0,
+
+	0x8000, 0x8008, 0x8018, 0x803c, 0x8200, 0x8208,
+	0x8400, 0x8424, 0x8430, 0x8450, 0x8600, 0x8610,
+	0x87d4, 0x87dc, 0x8800, 0x8820, 0x8a00, 0x8a0c,
+	0x8a4c, 0x8a50, 0x8c00, 0x8c20, 0x8c48, 0x8c48,
+	0x8c58, 0x8c74, 0x8c90, 0x8c98, 0x8e00, 0x8e0c,
+
+	0x9000, 0x9008, 0x9018, 0x903c, 0x9200, 0x9208,
+	0x9400, 0x9424, 0x9430, 0x9450, 0x9600, 0x9610,
+	0x97d4, 0x97dc, 0x9800, 0x9820, 0x9a00, 0x9a0c,
+	0x9a4c, 0x9a50, 0x9c00, 0x9c20, 0x9c48, 0x9c48,
+	0x9c58, 0x9c74, 0x9c90, 0x9c98, 0x9e00, 0x9e0c,
+
+	0x10000, 0x1000c, 0x12000, 0x12014,
+	0x12400, 0x12400, 0x12420, 0x12420
+};
+
+/* GPU = Z470 */
+
+static const int leia_registers[] = {
+	0x0000, 0x0008, 0x0010, 0x002c, 0x00ec, 0x00f4,
+	0x0100, 0x0110, 0x0118, 0x011c,
+	0x0700, 0x0704, 0x070c, 0x0720, 0x0754, 0x0764,
+	0x0770, 0x0774, 0x07a8, 0x07a8, 0x07b8, 0x07cc,
+	0x07d8, 0x07dc, 0x07f0, 0x07fc, 0x0e44, 0x0e48,
+	0x0e6c, 0x0e78, 0x0ec8, 0x0ed4, 0x0edc, 0x0edc,
+	0x0fe0, 0x0fec, 0x1100, 0x1100,
+
+	0x110c, 0x1110, 0x112c, 0x112c, 0x1134, 0x113c,
+	0x1148, 0x1148, 0x1150, 0x116c, 0x11fc, 0x11fc,
+	0x15e0, 0x161c, 0x1724, 0x1724, 0x1740, 0x1740,
+	0x1804, 0x1810, 0x1818, 0x1824, 0x182c, 0x1838,
+	0x184c, 0x1850, 0x28a4, 0x28ac, 0x28bc, 0x28c4,
+	0x2900, 0x2900, 0x2908, 0x290c, 0x2914, 0x2914,
+	0x2938, 0x293c, 0x30c0, 0x30c0, 0x30e0, 0x30e4,
+	0x30f0, 0x30f0, 0x3200, 0x3204, 0x3220, 0x324c,
+	0x3400, 0x340c, 0x3414, 0x3418, 0x3420, 0x342c,
+	0x34d0, 0x34d4, 0x36b8, 0x3704, 0x3720, 0x3750,
+	0x3760, 0x3764, 0x3800, 0x3800, 0x3808, 0x3810,
+	0x385c, 0x3878, 0x3b00, 0x3b24, 0x3b2c, 0x3b30,
+	0x3b40, 0x3b40, 0x3b50, 0x3b5c, 0x3b80, 0x3b88,
+	0x3c04, 0x3c08, 0x8000, 0x8008, 0x8018, 0x803c,
+	0x8200, 0x8208, 0x8400, 0x8408, 0x8410, 0x8424,
+	0x8430, 0x8450, 0x8600, 0x8610, 0x87d4, 0x87dc,
+	0x8800, 0x8808, 0x8810, 0x8810, 0x8820, 0x8820,
+	0x8a00, 0x8a08, 0x8a50, 0x8a50,
+	0x8c00, 0x8c20, 0x8c24, 0x8c28, 0x8c48, 0x8c48,
+	0x8c58, 0x8c58, 0x8c60, 0x8c74, 0x8c90, 0x8c98,
+	0x8e00, 0x8e0c, 0x9000, 0x9008, 0x9018, 0x903c,
+	0x9200, 0x9208, 0x9400, 0x9408, 0x9410, 0x9424,
+	0x9430, 0x9450, 0x9600, 0x9610, 0x97d4, 0x97dc,
+	0x9800, 0x9808, 0x9810, 0x9818, 0x9820, 0x9820,
+	0x9a00, 0x9a08, 0x9a50, 0x9a50, 0x9c00, 0x9c20,
+	0x9c48, 0x9c48, 0x9c58, 0x9c58, 0x9c60, 0x9c74,
+	0x9c90, 0x9c98, 0x9e00, 0x9e0c,
+
+	0x10000, 0x1000c, 0x12000, 0x12014,
+	0x12400, 0x12400, 0x12420, 0x12420
+};
+
+static struct {
+	int id;
+	const int *registers;
+	int len;
+} kgsl_registers[] = {
+	{ KGSL_CHIPID_LEIA_REV470, leia_registers,
+	  ARRAY_SIZE(leia_registers) / 2 },
+	{ KGSL_CHIPID_LEIA_REV470_TEMP, leia_registers,
+	  ARRAY_SIZE(leia_registers) / 2 },
+	{ KGSL_CHIPID_YAMATODX_REV21, yamato_registers,
+	  ARRAY_SIZE(yamato_registers) / 2 },
+	{ KGSL_CHIPID_YAMATODX_REV211, yamato_registers,
+	  ARRAY_SIZE(yamato_registers) / 2 },
+	{ 0x0, NULL, 0},
 };
 
 static uint32_t kgsl_is_pm4_len(uint32_t word)
@@ -133,59 +240,15 @@ static const char *kgsl_pm4_name(uint32_t word)
 	return "????????";
 }
 
-static void kgsl_yamato_dump_regs(struct kgsl_device *device)
+static void kgsl_dump_regs(struct kgsl_device *device,
+			   const int *registers, int size)
 {
-#ifndef CONFIG_MSM_KGSL_PSTMRTMDMP_NO_REG_DUMP
-	/* Byte offsets for registers. Each pair is in format of (start, end).
-	 */
-	static const int reg_ranges[] = {
-		0x0000, 0x0008, 0x0010, 0x002c, 0x00ec, 0x00f4,
-		0x0100, 0x0110, 0x0118, 0x011c, 0x0300, 0x0304,
-		0x0700, 0x0704, 0x070c, 0x0720, 0x0754, 0x0764,
-		0x0770, 0x0774, 0x07a8, 0x07a8, 0x07b8, 0x07cc,
-		0x07d8, 0x07dc, 0x07f0, 0x07fc, 0x0e44, 0x0e48,
-		0x0e6c, 0x0e78, 0x0ec8, 0x0ed4, 0x0edc, 0x0edc,
-		0x0fe0, 0x0fec, 0x1100, 0x1100,
-
-		0x110c, 0x1110, 0x112c, 0x112c, 0x1134, 0x113c,
-		0x1148, 0x1148, 0x1150, 0x116c, 0x11fc, 0x11fc,
-		0x15e0, 0x161c, 0x1724, 0x1724, 0x1740, 0x1740,
-		0x1804, 0x1810, 0x1818, 0x1824, 0x182c, 0x1838,
-		0x184c, 0x1850, 0x28a4, 0x28ac, 0x28bc, 0x28c4,
-		0x2900, 0x290c, 0x2914, 0x2914, 0x2938, 0x293c,
-		0x30b0, 0x30b0, 0x30c0, 0x30c0, 0x30e0, 0x30f0,
-		0x3100, 0x3100, 0x3110, 0x3110, 0x3200, 0x3218,
-		0x3220, 0x3250, 0x3264, 0x3268, 0x3290, 0x3294,
-		0x3400, 0x340c, 0x3418, 0x3418, 0x3420, 0x342c,
-		0x34d0, 0x34d4, 0x36b8, 0x3704, 0x3720, 0x3750,
-		0x3760, 0x3764, 0x3800, 0x3800, 0x3808, 0x3810,
-		0x385c, 0x3878, 0x3b00, 0x3b24, 0x3b2c, 0x3b30,
-		0x3b40, 0x3b40, 0x3b50, 0x3b5c, 0x3b80, 0x3b88,
-		0x3c04, 0x3c08, 0x3c30, 0x3c30, 0x3c38, 0x3c48,
-		0x3c98, 0x3ca8, 0x3cb0, 0x3cb0,
-
-		0x8000, 0x8008, 0x8018, 0x803c, 0x8200, 0x8208,
-		0x8400, 0x8424, 0x8430, 0x8450, 0x8600, 0x8610,
-		0x87d4, 0x87dc, 0x8800, 0x8820, 0x8a00, 0x8a0c,
-		0x8a4c, 0x8a50, 0x8c00, 0x8c20, 0x8c48, 0x8c48,
-		0x8c58, 0x8c74, 0x8c90, 0x8c98, 0x8e00, 0x8e0c,
-
-		0x9000, 0x9008, 0x9018, 0x903c, 0x9200, 0x9208,
-		0x9400, 0x9424, 0x9430, 0x9450, 0x9600, 0x9610,
-		0x97d4, 0x97dc, 0x9800, 0x9820, 0x9a00, 0x9a0c,
-		0x9a4c, 0x9a50, 0x9c00, 0x9c20, 0x9c48, 0x9c48,
-		0x9c58, 0x9c74, 0x9c90, 0x9c98, 0x9e00, 0x9e0c,
-
-		0x10000, 0x1000c, 0x12000, 0x12014,
-		0x12400, 0x12400, 0x12420, 0x12420
-	};
-
 	int range = 0, offset = 0;
 
-	for (range = 0; range < (ARRAY_SIZE(reg_ranges) / 2); range++) {
+	for (range = 0; range < size; range++) {
 		/* start and end are in dword offsets */
-		int start = reg_ranges[range * 2] / 4;
-		int end = reg_ranges[range * 2 + 1] / 4;
+		int start = registers[range * 2] / 4;
+		int end = registers[range * 2 + 1] / 4;
 
 		unsigned char linebuf[32 * 3 + 2 + 32 + 1];
 		int linelen, i;
@@ -203,7 +266,6 @@ static void kgsl_yamato_dump_regs(struct kgsl_device *device)
 				"REG: %5.5X: %s\n", offset<<2, linebuf);
 		}
 	}
-#endif
 }
 
 static void dump_ib(struct kgsl_device *device, char* buffId, uint32_t pt_base,
@@ -359,29 +421,56 @@ struct log_field {
 	const char *display;
 };
 
+static int kgsl_dump_fields_line(struct kgsl_device *device,
+				 const char *start, char *str, int slen,
+				 const struct log_field **lines,
+				 int num)
+{
+	const struct log_field *l = *lines;
+	int sptr, count  = 0;
+
+	sptr = snprintf(str, slen, "%s", start);
+
+	for (  ; num && sptr < slen; num--, l++) {
+		int ilen = strlen(l->display);
+
+		if (count)
+			ilen += strlen("  | ");
+
+		if (ilen > (slen - sptr))
+			break;
+
+		if (count++)
+			sptr += snprintf(str + sptr, slen - sptr, " | ");
+
+		sptr += snprintf(str + sptr, slen - sptr, "%s", l->display);
+	}
+
+	KGSL_LOG_DUMP(device, "%s\n", str);
+
+	*lines = l;
+	return num;
+}
+
 static void kgsl_dump_fields(struct kgsl_device *device,
 			     const char *start, const struct log_field *lines,
 			     int num)
 {
-	int count, i;
 	char lb[90];
+	const char *sstr = start;
 
-	strncpy(lb, start, sizeof(lb));
-	count = 0;
-	for (i = 0; i < num; ++i, ++lines) {
-		if (lines->show) {
-			if (count++)
-				strncat(lb, " | ", sizeof(lb));
-			strncat(lb, lines->display, sizeof(lb));
-			if (count == 6) {
-				KGSL_LOG_DUMP(device, "%s\n", lb);
-				strncpy(lb, "        ", sizeof(lb));
-				count = 0;
-			}
-		}
+	lb[sizeof(lb)  - 1] = '\0';
+
+	while (num) {
+		int ret = kgsl_dump_fields_line(device, sstr, lb,
+			sizeof(lb) - 1, &lines, num);
+
+		if (ret == num)
+			break;
+
+		num = ret;
+		sstr = "        ";
 	}
-	if (count)
-		KGSL_LOG_DUMP(device, "%s\n", lb);
 }
 
 static int kgsl_dump_yamato(struct kgsl_device *device)
@@ -404,7 +493,22 @@ static int kgsl_dump_yamato(struct kgsl_device *device)
 
 	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
 
+	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
+
 	mb();
+
+	KGSL_LOG_DUMP(device, "POWER: FLAGS = %08X | ACTIVE POWERLEVEL = %08X",
+			pwr->power_flags, pwr->active_pwrlevel);
+
+	KGSL_LOG_DUMP(device, "POWER: INTERVAL TIMEOUT = %08X ",
+		pwr->interval_timeout);
+
+	KGSL_LOG_DUMP(device, "GRP_CLK = %lu ",
+				  kgsl_get_clkrate(pwr->grp_clks[0]));
+
+	KGSL_LOG_DUMP(device, "BUS CLK = %lu ",
+		kgsl_get_clkrate(pwr->ebi1_clk));
+
 
 	kgsl_regread(device, REG_RBBM_STATUS, &rbbm_status);
 	kgsl_regread(device, REG_RBBM_PM_OVERRIDE1, &r2);
@@ -674,23 +778,63 @@ static int kgsl_dump_yamato(struct kgsl_device *device)
 		}
 	}
 
-	kgsl_yamato_dump_regs(device);
+	/* Dump the registers if the user asked for it */
+
+	for (i = 0; kgsl_pm_regs_enabled && kgsl_registers[i].id; i++) {
+		if (kgsl_registers[i].id == device->chip_id) {
+			kgsl_dump_regs(device, kgsl_registers[i].registers,
+				       kgsl_registers[i].len);
+			break;
+		}
+	}
+
 error_vfree:
 	vfree(rb_copy);
 end:
 	return result;
 }
 
-int kgsl_postmortem_dump(struct kgsl_device *device)
+/**
+ * kgsl_postmortem_dump - Dump the current GPU state
+ * @device - A pointer to the KGSL device to dump
+ * @manual - A flag that indicates if this was a manually triggered
+ *           dump (from debugfs).  If zero, then this is assumed to be a
+ *           dump automaticlaly triggered from a hang
+*/
+
+int kgsl_postmortem_dump(struct kgsl_device *device, int manual)
 {
-	/* If device state is already hung that means we already dumped
-	 * this hang or are in the process of dumping it */
-	if (device->state & KGSL_STATE_HUNG)
-		return 0;
+	bool saved_nap;
 
 	BUG_ON(device == NULL);
 
 	if (device->id == KGSL_DEVICE_YAMATO) {
+
+		/* For a manual dump, make sure that the system is idle */
+
+		if (manual) {
+			if (device->active_cnt != 0) {
+				mutex_unlock(&device->mutex);
+				wait_for_completion(&device->suspend_gate);
+				mutex_lock(&device->mutex);
+			}
+
+			if (device->state == KGSL_STATE_ACTIVE)
+				kgsl_idle(device,  KGSL_TIMEOUT_DEFAULT);
+
+		}
+		/* Disable the idle timer so we don't get interrupted */
+		del_timer(&device->idle_timer);
+
+		/* Turn off napping to make sure we have the clocks full
+		   attention through the following process */
+		saved_nap = device->pwrctrl.nap_allowed;
+		device->pwrctrl.nap_allowed = false;
+
+		/* Force on the clocks */
+		kgsl_pwrctrl_wake(device);
+
+		/* Disable the irq */
 		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_IRQ_OFF);
 
 		/* If this is not a manual trigger, then set up the
@@ -709,6 +853,22 @@ int kgsl_postmortem_dump(struct kgsl_device *device)
 		flush_workqueue(device->work_queue);
 		mutex_lock(&device->mutex);
 		kgsl_dump_yamato(device);
+
+		/* Restore nap mode */
+		device->pwrctrl.nap_allowed = saved_nap;
+
+		/* On a manual trigger, turn on the interrupts and put
+		   the clocks to sleep.  They will recover themselves
+		   on the next event.  For a hang, leave things as they
+		   are until recovery kicks in. */
+
+		if (manual) {
+			kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_IRQ_ON);
+
+			/* try to go into a sleep mode until the next event */
+			device->requested_state = KGSL_STATE_SLEEP;
+			kgsl_pwrctrl_sleep(device);
+		}
 	}
 	else
 		KGSL_DRV_CRIT(device, "Unknown device id - 0x%x\n", device->id);
@@ -737,6 +897,21 @@ DEFINE_SIMPLE_ATTRIBUTE(pm_dump_fops,
 			NULL,
 			pm_dump_set, "%llu\n");
 
+static int pm_regs_enabled_set(void *data, u64 val)
+{
+	kgsl_pm_regs_enabled = val ? 1 : 0;
+	return 0;
+}
+
+static int pm_regs_enabled_get(void *data, u64 *val)
+{
+	*val = kgsl_pm_regs_enabled;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(pm_regs_enabled_fops,
+			pm_regs_enabled_get,
+			pm_regs_enabled_set, "%llu\n");
 
 void kgsl_postmortem_init(struct kgsl_device *device)
 {
@@ -750,4 +925,6 @@ void kgsl_postmortem_init(struct kgsl_device *device)
 
 	debugfs_create_file("dump",  0600, pm_d_debugfs, device,
 			    &pm_dump_fops);
+	debugfs_create_file("regs_enabled", 0644, pm_d_debugfs, device,
+			    &pm_regs_enabled_fops);
 }

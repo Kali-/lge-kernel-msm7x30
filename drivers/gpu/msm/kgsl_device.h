@@ -70,6 +70,7 @@
 #define KGSL_STATE_SLEEP	0x00000008
 #define KGSL_STATE_SUSPEND	0x00000010
 #define KGSL_STATE_HUNG		0x00000020
+#define KGSL_STATE_DUMP_AND_RECOVER	0x00000040
 
 #define KGSL_GRAPHICS_MEMORY_LOW_WATERMARK  0x1000000
 
@@ -79,6 +80,7 @@ struct kgsl_device;
 struct platform_device;
 struct kgsl_device_private;
 struct kgsl_context;
+struct kgsl_power_stats;
 
 struct kgsl_functable {
 	void (*device_regread) (struct kgsl_device *device,
@@ -87,6 +89,12 @@ struct kgsl_functable {
 	void (*device_regwrite) (struct kgsl_device *device,
 					unsigned int offsetwords,
 					unsigned int value);
+	void (*device_regread_isr) (struct kgsl_device *device,
+				    unsigned int offsetwords,
+				    unsigned int *value);
+	void (*device_regwrite_isr) (struct kgsl_device *device,
+				     unsigned int offsetwords,
+				     unsigned int value);
 	int (*device_setstate) (struct kgsl_device *device, uint32_t flags);
 	int (*device_idle) (struct kgsl_device *device, unsigned int timeout);
 	unsigned int (*device_isidle) (struct kgsl_device *device);
@@ -122,7 +130,8 @@ struct kgsl_functable {
 
 	int (*device_cleanup_pt)(struct kgsl_device *device,
 				 struct kgsl_pagetable *pagetable);
-	unsigned int (*device_idle_calc)(struct kgsl_device *device);
+	void (*device_power_stats)(struct kgsl_device *device,
+		struct kgsl_power_stats *stats);
 };
 
 struct kgsl_memregion {
@@ -175,6 +184,7 @@ struct kgsl_device {
 	int drv_log;
 	int mem_log;
 	int pwr_log;
+	struct wake_lock idle_wakelock;
 };
 
 struct kgsl_context {
@@ -220,6 +230,11 @@ struct kgsl_devconfig {
 	unsigned int     va_range;
 
 	struct kgsl_memregion gmemspace;
+};
+
+struct kgsl_power_stats {
+	s64 total_time;
+	s64 busy_time;
 };
 
 struct kgsl_device *kgsl_get_device(int dev_idx);
