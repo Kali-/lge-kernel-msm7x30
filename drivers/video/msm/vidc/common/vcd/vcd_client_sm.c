@@ -374,7 +374,8 @@ static u32 vcd_flush_in_invalid(struct vcd_clnt_ctxt *cctxt,
 			cctxt->status.mask |= (mode & VCD_FLUSH_ALL);
 			vcd_send_flush_done(cctxt, VCD_S_SUCCESS);
 		}
-	}
+	} else
+		cctxt->status.mask |= (mode & VCD_FLUSH_ALL);
 	return rc;
 }
 
@@ -900,6 +901,11 @@ static void vcd_clnt_cb_in_run
 				VCD_EVT_IND_HWERRFATAL, status);
 			 break;
 		}
+	case VCD_EVT_IND_INFO_OUTPUT_RECONFIG:
+		{
+			vcd_handle_ind_info_output_reconfig(cctxt, status);
+			break;
+		}
 	default:
 		{
 			VCD_MSG_ERROR
@@ -993,6 +999,11 @@ static void vcd_clnt_cb_in_eos
 		{
 			vcd_handle_ind_hw_err_fatal(cctxt,
 				VCD_EVT_IND_HWERRFATAL,	status);
+			break;
+		}
+	case VCD_EVT_IND_INFO_OUTPUT_RECONFIG:
+		{
+			vcd_handle_ind_info_output_reconfig(cctxt, status);
 			break;
 		}
 	default:
