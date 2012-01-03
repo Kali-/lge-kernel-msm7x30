@@ -158,6 +158,9 @@ enum {
 	OVERLAY_PIPE_MAX
 };
 
+/* 2 VG pipes can be shared by RGB and VIDEO */
+#define MDP4_MAX_PIPE (OVERLAY_PIPE_MAX + 2)
+
 enum {
 	OVERLAY_TYPE_RGB,
 	OVERLAY_TYPE_VIDEO
