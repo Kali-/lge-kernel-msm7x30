@@ -1637,7 +1637,6 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 	}
 //[LGE_UPDATE_E] taeyol.kim@lge.com 2011-04-27
 
-	req_share = (req->flags & MDP_OV_PIPE_SHARE);
 	if (req->flags & MDP_OV_PIPE_SHARE)
 		ptype = OVERLAY_TYPE_VIDEO; /* VG pipe supports both RGB+YUV */
 
