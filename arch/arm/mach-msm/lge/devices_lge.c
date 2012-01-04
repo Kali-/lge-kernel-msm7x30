@@ -61,10 +61,9 @@
 
 /* setting board revision information */
 int lge_bd_rev;
-
+char *rev_str[] = { "evb", "rev_a", "rev_b", "rev_c", "rev_d", "rev_10","rev_11","rev_11",};
 static int __init board_revno_setup(char *rev_info)
 {
-	char *rev_str[] = { "evb", "rev_a", "rev_b", "rev_c", "rev_d", "rev_10","rev_11","rev_11",};
 	int i;
 
 	lge_bd_rev = LGE_REV_TOT_NUM;
@@ -79,8 +78,16 @@ static int __init board_revno_setup(char *rev_info)
 
 	return 1;
 }
-
 __setup("lge.rev=", board_revno_setup);
+
+int board_is_rev(char *rev_info)
+{
+	if (!strcmp(rev_info, rev_str[lge_bd_rev]))
+		return 1;
+
+	return 0;
+}
+EXPORT_SYMBOL(board_is_rev);
 
 /* setting whether uart console is enalbed or disabled */
 static int uart_console_mode = 0;

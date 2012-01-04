@@ -1371,7 +1371,11 @@ static int mt9p017_sensor_probe(const struct msm_camera_sensor_info *info,
 	s->s_release = mt9p017_sensor_release;
 	s->s_config  = mt9p017_sensor_config;
 	s->s_camera_type = BACK_CAMERA_2D;
-	s->s_mount_angle = 0;
+
+	if (board_is_rev("rev_c"))
+		s->s_mount_angle = 270;
+	else
+		s->s_mount_angle = 0;
 
 	CDBG("mt9p017_sensor_probe: SENSOR PROBE completed !\n");
 	return rc;

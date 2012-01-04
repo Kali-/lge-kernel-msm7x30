@@ -283,7 +283,8 @@ void *lge_get_fb_copy_virt_rgb888_addr(void);
 unsigned int lge_get_fb_phys_addr(void);
 #endif // CONFIG_LGE_HIDDEN_RESET_PATCH
 
-
 #endif
+
+int board_is_rev(char *);
 
 #endif
