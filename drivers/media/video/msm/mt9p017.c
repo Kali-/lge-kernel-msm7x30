@@ -1374,6 +1374,8 @@ static int mt9p017_sensor_probe(const struct msm_camera_sensor_info *info,
 
 	if (board_is_rev("rev_c"))
 		s->s_mount_angle = 270;
+	else if (board_is_rev("rev_10"))
+		s->s_mount_angle = 90;
 	else
 		s->s_mount_angle = 0;
 
